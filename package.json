@@ -16,6 +16,7 @@
     "keygen": "node dist/keygen.js",
     "cold:export-public": "node dist/cold-export-public.js",
     "hot:watch": "node dist/hot-watch.js",
+    "hot:dust-watch": "node dist/dust-watch.js",
     "cold:transfer": "node dist/cold-transfer.js",
     "hot:sponsor-register": "node dist/sponsor-register.js",
     "hot:sponsor-submit": "node dist/sponsor-submit.js",

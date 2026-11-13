@@ -23,6 +23,7 @@ must never hold real funds.
 | `sponsor-register` | hot | `SPONSOR_MNEMONIC` or `SPONSOR_SEED`; `SPONSOR_PASSPHRASE` (optional) | One-time: registers the sponsor's NIGHT for DUST |
 | `cold-transfer` | cold | `COLD_MNEMONIC` or `COLD_SEED`; `COLD_PASSPHRASE` (optional) | Builds, signs, finalizes the transfer, writes `tx.hex` |
 | `sponsor-submit` | hot | `SPONSOR_MNEMONIC` or `SPONSOR_SEED`; `SPONSOR_PASSPHRASE` (optional) | Adds DUST for the fee and submits `tx.hex` |
+| `dust-watch` | hot | no | Lists the NIGHT coins that generate DUST for a DUST address and estimates the DUST generated, from public data (section 12). Passed on Preprod (T38); the estimate is not yet compared with a real balance |
 | `dist/cold-page.html` | cold, in a browser | recovery phrase typed into the page | Does the work of `cold-export-public` and `cold-transfer` without Node (section 10). Two transfers passed on Preprod (T30–T32) |
 | `tools/hot_server.py` + `dist/hot-page.html` | hot, in a browser | none typed into the page; the scripts it starts read `SPONSOR_*` and `BLOCKFROST_PROJECT_ID` from the terminal it was started in | Runs `hot-watch` and `sponsor-submit` from a local page and moves the files as QR codes (section 11). **Not yet run on a real network** |
 
@@ -236,6 +237,7 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T35 *new* | Hot page: receives `tx.hex` by QR, shows the same plan as `sponsor-submit`, and after a typed `SUBMIT` the sponsor pays and the transfer is submitted | **Not yet run** (stand-in `sponsor-submit` in the tests) |
 | T36 *new* | Hot page: *Take a fresh snapshot and check* reports the transfer as landed | **Not yet run** |
 | T37 *new* | Hot page: a dry run and a *Cancel* at the question submit nothing and leave the sponsor's DUST free; the page and terminal show no token or phrase | **Not yet run** |
+| T38 *new* | `dust-watch <DUST address>` lists the generating NIGHT for a DUST address, and its estimate is close to the balance `sponsor-submit` prints for a sponsor that has not spent recently | Passed on Preprod (2026-11-13) for the listing: Blockfrost served the query, the answer was complete in 5 s, 3 coins listed, one reported as stopped after its NIGHT was spent, estimates consistent with the cap (5 DUST per NIGHT over 7 days). **Comparison with a real balance: not yet run** |
 
 **How the new tests are run**
 
@@ -471,6 +473,9 @@ parsing it.
   `hot-inspect` reading a real ledger 9 transaction. Not run: a real `hot-watch` or `sponsor-submit` under the server (long
   first sync, real output, the real prompt), the landing check against the chain, camera input, Firefox (only Chromium tried),
   and mainnet (T34–T37).
+- **`dust-watch` (section 12): the listing passed on Preprod (T38, 2026-11-13); the estimate is unconfirmed.** Blockfrost
+  serves the `dustGenerations` subscription and ends the stream by itself. The estimate was consistent with the cap but has
+  not been compared with the balance a wallet reports. Not run: an address with no registration, the other networks, mainnet.
 - `qr_scan.py --clipboard`: used on Tails on 2026-11-13 to paste a snapshot into the cold page, which accepted it. Which
   clipboard tool it used there (`wl-copy`, `xclip`, `xsel` or the Tk window) was not noted; the other paths are checked only
   with fake tools.
@@ -862,3 +867,29 @@ refusals, that arguments are fixed, the question detection, the `SUBMIT` rules a
 environment never appears in an answer. `npm run test:hotpage` drives the page in headless Chromium through all five
 steps against a real server. Both use stand-ins for `hot-watch` and `sponsor-submit` (`tests-hot/fake-dist/`): no wallet,
 no network. `hot-inspect` is the real one in the page test, reading a real transaction built with a throwaway key.
+
+## 12. `dust-watch`: is NIGHT generating DUST for an address?
+
+```bash
+node dist/dust-watch.js mn_dust_preprod1...        # or: npm run hot:dust-watch -- mn_dust_preprod1...
+```
+
+Run on the hot machine with `MIDNIGHT_NETWORK` and `BLOCKFROST_PROJECT_ID` set as for `hot-watch`. It needs **no seed and no
+secret key**: a DUST address is public. `sponsor-submit` prints the sponsor's as `Sponsor DUST address:`. **Status: the
+listing passed on Preprod (T38); the estimate has not been compared with a real balance.**
+
+It asks the indexer which NIGHT coins generate DUST for that address (the same public query the SDK's DUST wallet uses) and
+prints each one: the NIGHT amount, since when, whether it is still generating or stopped because the NIGHT was spent, and
+the transaction. No coins listed means no registration is generating for that address yet. With the block's DUST parameters
+it also estimates what those coins have generated, using the ledger's own formula.
+
+When a registered NIGHT coin is spent, its entry shows as *stopped* and its DUST decays at the rate it was generated, while
+the change coin starts a new entry that grows at the same rate. Right after a spend the two together still add up to about
+what the old coin held, which is why the total barely moves.
+
+**It is not a balance.** DUST already spent on fees is not subtracted. Only a wallet holding the DUST secret key can see
+what was spent: the ledger has a single DUST key that both reads and spends, with no view-only key. For the sponsor, the
+real balance is the `Sponsor DUST balance:` line of `sponsor-submit`.
+
+`DUST_WATCH_TIMEOUT_SECONDS` (default 120): how long to wait for the indexer to finish its answer before reporting what
+arrived.
