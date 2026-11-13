@@ -25,11 +25,12 @@ keys. Do not add them without a design that keeps those keys off the hot machine
 | `src/qr-send.ts`, `qr-decode.ts`, `receiver/`, `tools/qr_scan.py` | QR transfer. `scripts/build-receiver.mjs` is build-time only. |
 | `src/mqr-core.ts` | The MQR1 frame pattern, splitting and joining: pure, shared by `mqr.ts` (Node) and `coldpage/mqr-web.ts`. |
 | `src/coldpage/`, `cold-page/cold-page.template.html`, `scripts/build-cold-page.mjs` | **Cold page** `dist/cold-page.html` (README section 10): cold side in a browser, built on the ledger 9 package directly, no wallet SDK wallets. `core.ts` takes the ledger as a parameter (no SDK import at run time); `keys.ts` uses the SDK's HD package; `ui.ts` is browser-only. Two NIGHT transfers passed on Preprod from Tails (T30–T32); README section 6 lists what is not yet run. |
+| `tools/hot_server.py`, `src/hotpage/`, `hot-page/hot-page.template.html`, `scripts/build-hot-page.mjs`, `src/hot-inspect.ts` | **Hot page** (README section 11): a stdlib-Python server on 127.0.0.1 that serves `dist/hot-page.html` and starts `hot-watch` / `sponsor-submit` with fixed arguments. Secrets stay in the server's environment for the scripts to read; the server must never copy, log or return them. `hot-inspect` is read-only (no sync, no secret). Not yet run on a real network. |
 | `.githooks/pre-commit`, `.gitignore`, `.gitmessage`, `CONTRIBUTING.md` | Keep secrets and wallet data out of commits. |
 
 ## Commands
 
-`npm ci`, then `npm run build` (tsc, `dist/receiver.html` and `dist/cold-page.html`). **Scripts run from `dist/`, not `src/`:** rebuild after every edit. Typecheck with `npx tsc --noEmit`.
+`npm ci`, then `npm run build` (tsc, `dist/receiver.html`, `dist/cold-page.html` and `dist/hot-page.html`). **Scripts run from `dist/`, not `src/`:** rebuild after every edit. Typecheck with `npx tsc --noEmit`.
 Run scripts with `node dist/<name>.js` or the npm scripts (`cold:export-public`, `hot:watch`, `cold:transfer`, `hot:sponsor-register`, `hot:sponsor-submit`, `probe:cold-era`).
 **npm swallows flags:** write `npm run <script> -- --dry-run`. Env: `MIDNIGHT_NETWORK` (default `preprod`), `BLOCKFROST_PROJECT_ID`, `PROOF_SERVER_URL`,
 `COLD_MNEMONIC`/`COLD_PASSPHRASE`, `SPONSOR_MNEMONIC`/`SPONSOR_PASSPHRASE`, plus `ASSUME_LEDGER9`, `TTL_MINUTES`, `SNAPSHOT_FILE`, `COLD_PUBLIC_FILE`,
@@ -101,8 +102,15 @@ by the network); hot scripts stop if `cold-public.json` names another network. T
 - `npm run test:sdk`: `tests-sdk/`, the only tests that import the SDK. They compare the cold page's code with the SDK facade
   offline, with random throwaway keys and made-up snapshots. Run after any SDK or ledger upgrade and any change to `src/coldpage/`.
 - `npm run test:page`: drives the built `dist/cold-page.html` in headless Chromium (`scripts/test-cold-page.mjs`); build first.
+- `npm run test:server` (Python `unittest`, `tests-hot/`) and `npm run test:hotpage` (`scripts/test-hot-page.mjs`, Chromium):
+  the hot page and its server with stand-in scripts in `tests-hot/fake-dist/`. Run after any change to `tools/hot_server.py`,
+  `src/hotpage/` or the wording of `sponsor-submit`'s question (`PROMPT` in the server must match it).
 - The SDK-dependent scripts are checked by `tsc` and the manual plan in `README.md`. Passing these tests is not "verified":
   that word means run on a real network. Never verify a script or the page with a real seed.
+- **The hot server must keep its rules:** 127.0.0.1 only, token plus `Host` and `Origin` checks on every request, fixed argv,
+  no request data in a command line or environment, `SUBMIT` only at the prompt and bound to the `tx.hex` the run started with.
+  The hot page reuses `coldpage/mqr-web.ts` but repeats the cold page's QR and camera glue on purpose, so the cold page's bytes
+  do not change when the hot page does.
 - **The cold page must stay unable to reach a network:** nothing loaded from outside the file, `connect-src 'none'` in the
   template, no storage. It must keep every check `cold-transfer` makes, and `verifyBuilt` on the bytes it shows.
 

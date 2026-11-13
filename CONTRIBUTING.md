@@ -60,7 +60,7 @@ addresses in documentation and tests.
 | `build` | Build, dependencies, the lockfile |
 | `chore` | Everything else |
 
-Scopes: `cold`, `coldpage`, `hot`, `sponsor`, `qr`, `scanner`, `config`, `keys`, `snapshot`, `readme`, `deps`, `bundle`.
+Scopes: `cold`, `coldpage`, `hot`, `hotpage`, `sponsor`, `qr`, `scanner`, `config`, `keys`, `snapshot`, `readme`, `deps`, `bundle`.
 
 The body says **why**, and what could go wrong. Two trailers go at the bottom of every commit:
 
@@ -127,3 +127,4 @@ Update `README.md` in the same commit as the behaviour change: the test table (s
 (section 6), and any new environment variable. A test is **verified** only if it was run on a real network; code that
 passed tests against fake data is "not yet run". Unit tests go in `tests/` and stay free of the SDK (`npm test`). Tests that
 need the SDK go in `tests-sdk/` (`npm run test:sdk`); `npm run test:page` drives the built cold page in headless Chromium.
+The hot page and its server are tested with stand-in scripts: `npm run test:server` (Python, `tests-hot/`) and `npm run test:hotpage`.

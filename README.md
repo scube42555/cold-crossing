@@ -24,6 +24,7 @@ must never hold real funds.
 | `cold-transfer` | cold | `COLD_MNEMONIC` or `COLD_SEED`; `COLD_PASSPHRASE` (optional) | Builds, signs, finalizes the transfer, writes `tx.hex` |
 | `sponsor-submit` | hot | `SPONSOR_MNEMONIC` or `SPONSOR_SEED`; `SPONSOR_PASSPHRASE` (optional) | Adds DUST for the fee and submits `tx.hex` |
 | `dist/cold-page.html` | cold, in a browser | recovery phrase typed into the page | Does the work of `cold-export-public` and `cold-transfer` without Node (section 10). Two transfers passed on Preprod (T30–T32) |
+| `tools/hot_server.py` + `dist/hot-page.html` | hot, in a browser | none typed into the page; the scripts it starts read `SPONSOR_*` and `BLOCKFROST_PROJECT_ID` from the terminal it was started in | Runs `hot-watch` and `sponsor-submit` from a local page and moves the files as QR codes (section 11). **Not yet run on a real network** |
 
 The cold and sponsor wallets use different variable names on purpose, so they cannot be mixed up.
 The scripts delete the variable from the process environment once they have read it. A BIP-39 passphrase goes in `COLD_PASSPHRASE` or `SPONSOR_PASSPHRASE` (section 3).
@@ -41,6 +42,8 @@ npm run build                             # compiles src/ to dist/; fix any type
 npm test                                  # SDK-free unit tests (logfilter, snapshot, txinfo, mqr, cold page core)
 npm run test:sdk                          # cold page code compared with the wallet SDK (imports the SDK; offline)
 npm run test:page                         # dist/cold-page.html driven in headless Chromium (needs chromium)
+npm run test:server                       # tools/hot_server.py with stand-in scripts (needs python3 and node)
+npm run test:hotpage                      # dist/hot-page.html and the server in headless Chromium, stand-in scripts
 ```
 
 If `npm run build` reports an error, send me the message. A renamed export or type is the most
@@ -229,6 +232,10 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T31 *new* | Cold page offline on the cold machine: loads a real `hot-watch` snapshot, signs after `SEND`, and `sponsor-submit` accepts and submits its `tx.hex` | **Passed on Preprod (2026-11-13)**: `sponsor-submit` submitted the page's `tx.hex` and the transfer landed. Repeated the same day with the later build (snapshot loaded as a file, recipient address worked out from its recovery phrase, `tx.hex` sent back by QR with the SHA-256 equal on both sides): landed too. NIGHT only; other tokens not tried |
 | T32 *new* | Cold page in the cold machine's own browser (Tails / Tor Browser): the ledger module starts, file and paste input work | Passed on Tails with Tor Browser (2026-11-13, security level not noted): the ledger module started; the snapshot came in by `qr_scan.py --clipboard` and paste, and in a second run as a loaded file (the SHA-256 line showed). A reload emptied every field. Camera not tried |
 | T33 *new* | Cold page refuses a snapshot for another network, another wallet or from before ledger 9, and an amount above the balance | Not yet run on real files. On fake data: passed (`test:page`) |
+| T34 *new* | Hot page: receives `cold-public.json` from the cold page, runs `hot-watch`, and the snapshot it shows as QR is accepted by the cold page with the same SHA-256 | **Not yet run.** On fake data: passed (`test:server`, `test:hotpage`) |
+| T35 *new* | Hot page: receives `tx.hex` by QR, shows the same plan as `sponsor-submit`, and after a typed `SUBMIT` the sponsor pays and the transfer is submitted | **Not yet run** (stand-in `sponsor-submit` in the tests) |
+| T36 *new* | Hot page: *Take a fresh snapshot and check* reports the transfer as landed | **Not yet run** |
+| T37 *new* | Hot page: a dry run and a *Cancel* at the question submit nothing and leave the sponsor's DUST free; the page and terminal show no token or phrase | **Not yet run** |
 
 **How the new tests are run**
 
@@ -459,6 +466,11 @@ parsing it.
   large clock and the emptying of fields on reload were tried on Tails and looked right. Still not run on a real network: a non-NIGHT token, the refusals on real files (T33), camera
   input, other browsers, and mainnet. The page builds the transaction with the ledger 9 package directly, not
   through the wallet SDK; after any SDK or ledger upgrade run `npm run test:sdk` and repeat T31.
+- **The hot page (`tools/hot_server.py`, `dist/hot-page.html`, section 11): not yet run on a real network.** Tested only with
+  stand-in scripts that copy prepared files and ask `sponsor-submit`'s question; the plan shown comes from the real
+  `hot-inspect` reading a real ledger 9 transaction. Not run: a real `hot-watch` or `sponsor-submit` under the server (long
+  first sync, real output, the real prompt), the landing check against the chain, camera input, Firefox (only Chromium tried),
+  and mainnet (T34–T37).
 - `qr_scan.py --clipboard`: used on Tails on 2026-11-13 to paste a snapshot into the cold page, which accepted it. Which
   clipboard tool it used there (`wl-copy`, `xclip`, `xsel` or the Tk window) was not noted; the other paths are checked only
   with fake tools.
@@ -786,3 +798,67 @@ Chromium through the whole flow and checks its output with the Node code. All th
 
 **After a wallet SDK or ledger upgrade**, run `test:sdk` before trusting a new page: it is what notices if the SDK starts
 building transfers differently from the page.
+
+## 11. Hot page: the hot side in a browser
+
+`python3 tools/hot_server.py` serves `dist/hot-page.html` on this computer only and starts the hot scripts for you.
+**Status: built and tested with stand-in scripts only; not yet run on a real network (T34–T37).** The scripts it starts
+(`hot-watch`, `sponsor-submit`) are the verified ones, unchanged; what is new is the server, the page and `hot-inspect`.
+`sponsor-register` is not in the page: run it from the terminal as before.
+
+**Starting it.** Use the terminal where you would run the hot scripts, with the same variables set the same way
+(`read -rs`, one at a time, then `export`):
+
+```bash
+export MIDNIGHT_NETWORK=preprod
+read -rs BLOCKFROST_PROJECT_ID; export BLOCKFROST_PROJECT_ID
+read -rs SPONSOR_MNEMONIC; export SPONSOR_MNEMONIC          # and SPONSOR_PASSPHRASE if it has one
+python3 tools/hot_server.py                                  # options: --dir <folder> --port 8765 --node <path>
+```
+
+It prints the network, the folder, the page's SHA-256 and a URL such as `http://127.0.0.1:8765/#<token>`. Open that whole
+URL in a browser on the same machine. The proof server must be running for step 4, as for `sponsor-submit`. Stop the
+server with Ctrl+C; a script that is still running is stopped with it. `--dir` is the folder the scripts run in:
+`cold-public.json`, the snapshot, `tx.hex` and the sponsor's `wallet-state-*.json` live there (default: the current folder).
+
+**The steps on the page**
+
+1. **Public key file:** receive `cold-public.json` from the cold page (QR kind `pubkey`, a file, or paste). Once per wallet.
+2. **Snapshot:** *Take a snapshot* runs `hot-watch` and shows its output. Then *Show as QR for the cold machine* (kind
+   `snapshot`) or download it. The SHA-256 shown is the one the cold page shows when it reads the snapshot.
+3. **Signed transfer:** receive `tx.hex` from the cold page (QR kind `tx`, a file, or paste). The page shows its SHA-256 and
+   the same plan `sponsor-submit` prints (From, coins, To, Change, expiry).
+4. **Submit:** *Start sponsor-submit* runs the script and shows its output as it comes, including the long first sync. When
+   it asks, type `SUBMIT` on the page. *Dry run* passes `--dry-run`. *Cancel* at the question answers no.
+5. **Landed?** *Take a fresh snapshot and check* runs `hot-watch` again. If none of the coins the transfer spent are in the
+   new snapshot, the page says it landed. That snapshot is also the one for the next transfer.
+
+**What protects it**
+
+- **Secrets stay in the terminal.** The scripts inherit the server's environment and read the phrase and the token
+  themselves. The server only checks whether they are set, to show a checklist; it never copies, logs or returns them, and
+  nothing is typed into the page. Script output goes through the same redaction as in a terminal (`redact.ts`).
+- **Only this computer, only this page.** The server listens on 127.0.0.1. Every request needs the token from the URL, and
+  a request whose `Host` or `Origin` is not this server is refused, so another web page open in the same browser cannot
+  drive it. The page's security policy lets it talk to this server and nothing else.
+- **Fixed commands.** A request can only choose between `hot-watch` and `sponsor-submit` (with or without `--dry-run`).
+  File names and arguments are fixed; nothing from the page reaches a command line or the environment. One script runs at
+  a time, and no file can be replaced while one runs.
+- **Files from the cold machine are checked before they are written:** `cold-public.json` must have exactly the expected
+  fields, `"sdk": 2`, this network and an unshielded address of this network; `tx.hex` must be one line of lowercase hex.
+  QR frames go through the same checks as `qr-decode` (one session, SHA-256, 4 MB limit).
+- **`SUBMIT` is tied to the transfer.** The server passes `SUBMIT` to the script only while the script is asking, only for
+  the exact word, and only if the page is confirming the `tx.hex` the script started with. After `SUBMIT`, *Cancel* is
+  refused: the script is left to finish, as stopping it mid-way could leave the sponsor's DUST locked until expiry.
+
+**What it cannot do.** The landing check infers from the wallet's coins: it cannot tell "landed" from "those coins were
+spent by another transaction". It does not query the chain for the transaction id. If a transfer empties the wallet,
+`hot-watch` waits for a coin and stops after `WATCH_TIMEOUT_MINUTES` (10): the output says so. Anyone who can run programs
+as your user on the hot machine can read the token from the browser or the terminal; the server is no protection against
+that, and neither is a terminal.
+
+**Tests.** `npm run test:server` (Python `unittest`, 18 tests) checks the file validation, the Host / Origin / token
+refusals, that arguments are fixed, the question detection, the `SUBMIT` rules and that a made-up secret set in the
+environment never appears in an answer. `npm run test:hotpage` drives the page in headless Chromium through all five
+steps against a real server. Both use stand-ins for `hot-watch` and `sponsor-submit` (`tests-hot/fake-dist/`): no wallet,
+no network. `hot-inspect` is the real one in the page test, reading a real transaction built with a throwaway key.
