@@ -953,6 +953,17 @@ node dist/cold-shielded-transfer.js <recipient mn_shield-addr_...> <amount> --to
 npm run hot:sponsor-submit
 ```
 
+**By QR instead of USB** (section 7): send the feed as kind `feed` and the transaction as kind `tx`. `qr-decode` checks a
+`feed` fully (the same `inspectFeed` check the cold script makes) and prints its summary before writing it. Measured with
+`.mqr` files, not yet with a camera: a 2-transaction feed is 9 frames; a shielded `tx.hex` (1 spend, 2 outputs, 31 KB of
+hex) is 75 frames at the default size, 38 with `--chunk 600`.
+
+```bash
+node dist/qr-send.js feed cold-zswap.feed.json --html feed-qr.html              # hot
+node dist/qr-decode.js received-feed-<session>.mqr cold-zswap.feed.json         # cold, after qr_scan.py
+node dist/qr-send.js tx tx.hex --html tx-qr.html --chunk 600                     # cold
+```
+
 Settings: `COLD_TX_LIST` (default `cold-shielded-txs.txt`), `FEED_FILE` (default `cold-zswap.feed.json`); options
 `--list`, `--out` (hot), `--feed`, `--keys`, `--out` (cold). The feed and the list are wallet data: `.gitignore` and the
 pre-commit hook keep them out of commits.
