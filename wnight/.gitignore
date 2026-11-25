@@ -7,3 +7,4 @@ contract/src/managed/
 .deployment.json
 *.log
 logs/
+midnight-level-db/

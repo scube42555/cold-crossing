@@ -17,6 +17,7 @@
     "wallets": "MIDNIGHT_NETWORK=preprod tsx cli/src/wallets.ts",
     "deploy": "MIDNIGHT_NETWORK=preprod tsx cli/src/deploy.ts",
     "deposit": "MIDNIGHT_NETWORK=preprod tsx cli/src/deposit.ts",
+    "consolidate": "MIDNIGHT_NETWORK=preprod tsx cli/src/consolidate.ts",
     "transfer": "MIDNIGHT_NETWORK=preprod tsx cli/src/transfer.ts",
     "redeem": "MIDNIGHT_NETWORK=preprod tsx cli/src/redeem.ts"
   },
