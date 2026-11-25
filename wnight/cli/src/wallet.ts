@@ -273,6 +273,7 @@ function isProgressStrictlyComplete(progress: unknown): boolean {
 }
 
 const SYNC_LOG_INTERVAL_MS = Number(process.env['MIDNIGHT_SYNC_LOG_INTERVAL_MS'] ?? 15_000);
+const SAVE_INTERVAL_MS = Number(process.env['MIDNIGHT_WALLET_SAVE_INTERVAL_MS'] ?? 300_000);
 
 /**
  * How far one part of the wallet has synced, as the same two numbers its
@@ -293,14 +294,15 @@ function progressNumbers(progress: unknown): { applied: bigint; target: bigint }
 }
 
 /**
- * "done", "42.3%", or "syncing" when the numbers aren't available. The target
+ * "done", "42.3%", "starting" before the target is known, or "syncing"
+ * when the numbers aren't available. The target
  * moves as new blocks arrive, so the percentage can briefly dip.
  */
 export function describeProgress(progress: unknown): string {
   if (isProgressStrictlyComplete(progress)) return 'done';
   const n = progressNumbers(progress);
   if (!n) return 'syncing';
-  if (n.target <= 0n) return '0.0%';
+  if (n.target <= 0n) return 'starting'; // target not reported yet
   // Capped below 100 until the SDK itself reports complete.
   const permille = n.applied >= n.target ? 999n : (n.applied * 1000n) / n.target;
   return `${permille / 10n}.${permille % 10n}%`;
@@ -319,50 +321,82 @@ export async function syncWallet(
   // (LOG_LEVEL=trace), and the raw progress numbers to debug.
   let lastFlags = '';
   let lastLogAt = 0;
-  const state = await Rx.firstValueFrom(
-    wallet.state().pipe(
-      Rx.tap((state: FacadeState) => {
-        emissionCount++;
-        const parts = { shielded: state.shielded.progress, unshielded: state.unshielded.progress, dust: state.dust.progress };
-        const flags = Object.values(parts).map(isProgressStrictlyComplete).join();
-        const line =
-          `Wallet sync: ` +
-          Object.entries(parts).map(([name, p]) => `${name} ${describeProgress(p)}`).join(', ') +
-          ` (update ${emissionCount})`;
-        if (flags !== lastFlags || Date.now() - lastLogAt >= SYNC_LOG_INTERVAL_MS) {
-          logger.info(line);
-          lastFlags = flags;
-          lastLogAt = Date.now();
-        } else {
-          logger.trace(line);
-        }
-        if (logger.isLevelEnabled('debug')) {
-          for (const [name, p] of Object.entries(parts)) {
-            const n = progressNumbers(p);
-            if (n) logger.debug(`  ${name}: applied ${n.applied} of ${n.target}`);
+
+  // wnight change: save sync progress every SAVE_INTERVAL_MS, on Ctrl-C, and
+  // if the sync fails, not only once it completes. A first sync on a
+  // long-lived network can take hours; an interrupted run then resumes from
+  // the last save instead of starting from 0%. No-op where saving is off
+  // (local devnet, MIDNIGHT_WALLET_STATE=off).
+  let saving: Promise<void> | undefined;
+  const saveProgress = (): Promise<void> =>
+    (saving ??= saveWalletState(logger, wallet)
+      .catch((err: unknown) => logger.warn(`Could not save wallet sync progress: ${String(err)}`))
+      .finally(() => {
+        saving = undefined;
+      }));
+  const timer = setInterval(() => void saveProgress(), SAVE_INTERVAL_MS);
+  const onSigint = () => {
+    logger.warn('Interrupted: saving wallet sync progress before exiting (Ctrl-C again to quit without saving)...');
+    process.once('SIGINT', () => process.exit(130));
+    void saveProgress().finally(() => process.exit(130));
+  };
+  process.once('SIGINT', onSigint);
+
+  let state: FacadeState;
+  try {
+    state = await Rx.firstValueFrom(
+      wallet.state().pipe(
+        Rx.tap((state: FacadeState) => {
+          emissionCount++;
+          const parts = { shielded: state.shielded.progress, unshielded: state.unshielded.progress, dust: state.dust.progress };
+          const flags = Object.values(parts).map(isProgressStrictlyComplete).join();
+          const line =
+            `Wallet sync: ` +
+            Object.entries(parts).map(([name, p]) => `${name} ${describeProgress(p)}`).join(', ') +
+            ` (update ${emissionCount})`;
+          if (flags !== lastFlags || Date.now() - lastLogAt >= SYNC_LOG_INTERVAL_MS) {
+            logger.info(line);
+            lastFlags = flags;
+            lastLogAt = Date.now();
+          } else {
+            logger.trace(line);
           }
-        }
-      }),
-      Rx.filter(
-        (state: FacadeState) =>
-          isProgressStrictlyComplete(state.shielded.progress) &&
-          isProgressStrictlyComplete(state.dust.progress) &&
-          isProgressStrictlyComplete(state.unshielded.progress),
+          if (logger.isLevelEnabled('debug')) {
+            for (const [name, p] of Object.entries(parts)) {
+              const n = progressNumbers(p);
+              if (n) logger.debug(`  ${name}: applied ${n.applied} of ${n.target}`);
+            }
+          }
+        }),
+        Rx.filter(
+          (state: FacadeState) =>
+            isProgressStrictlyComplete(state.shielded.progress) &&
+            isProgressStrictlyComplete(state.dust.progress) &&
+            isProgressStrictlyComplete(state.unshielded.progress),
+        ),
+        Rx.tap(() => logger.info(`Wallet sync complete after ${emissionCount} emissions`)),
+        Rx.timeout({
+          each: timeout,
+          with: () =>
+            Rx.throwError(
+              () => new Error(`Wallet sync timeout after ${timeout}ms (${emissionCount} emissions received)`),
+            ),
+        }),
+        Rx.catchError((err) => {
+          logger.error(`Wallet sync error: ${err}`);
+          return Rx.throwError(() => err);
+        }),
       ),
-      Rx.tap(() => logger.info(`Wallet sync complete after ${emissionCount} emissions`)),
-      Rx.timeout({
-        each: timeout,
-        with: () =>
-          Rx.throwError(
-            () => new Error(`Wallet sync timeout after ${timeout}ms (${emissionCount} emissions received)`),
-          ),
-      }),
-      Rx.catchError((err) => {
-        logger.error(`Wallet sync error: ${err}`);
-        return Rx.throwError(() => err);
-      }),
-    ),
-  );
+    );
+  } catch (err) {
+    // Keep what was synced so far for the next run.
+    await saveProgress();
+    throw err;
+  } finally {
+    clearInterval(timer);
+    process.off('SIGINT', onSigint);
+  }
+  await saving;
   await saveWalletState(logger, wallet);
   return state;
 }
