@@ -68,7 +68,26 @@ await runScript(async (opened) => {
   logger.info(`proofs by circuit (one key lookup each): ${[...byCircuit].map(([c, n]) => `${c} x${n}`).join(', ')}`);
   for (const e of wasmProofEvents()) logger.debug(`  +${secs(e.atMs)} ${e.what}`);
 
-  const txId = await b.wallet.submitTransaction(finalized);
+  // Print the identifier first: the SDK's submit waits on the node connection, which Blockfrost sometimes drops, and a
+  // run stuck there must still leave you the ID to find the transaction (and to list it for a cold wallet's feed).
+  const [identifier] = tx.identifiers();
+  logger.info(`submitting; transaction identifier ${identifier}`);
+  const SUBMIT_WAIT_MS = 3 * 60_000;
+  const txId = await Promise.race([
+    b.wallet.submitTransaction(finalized),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `submit did not return within ${SUBMIT_WAIT_MS / 60_000} minutes (node connection?). The transaction may still ` +
+                `have landed: look up identifier ${identifier} on the indexer or explorer before sending again.`,
+            ),
+          ),
+        SUBMIT_WAIT_MS,
+      ),
+    ),
+  ]);
   logger.info(`submitted ${txId}; waiting for it on chain...`);
 
   // Confirmed when the spent wNIGHT coin(s) are gone and nothing is pending.
