@@ -22,7 +22,11 @@
     "hot:sponsor-submit": "node dist/sponsor-submit.js",
     "qr:send": "node dist/qr-send.js",
     "qr:decode": "node dist/qr-decode.js",
-    "probe:cold-era": "node dist/probe-cold-era.js"
+    "probe:cold-era": "node dist/probe-cold-era.js",
+    "fetch:prover-keys": "node scripts/fetch-prover-keys.mjs",
+    "build:prover-lab": "tsc && node scripts/build-prover-lab.mjs",
+    "test:prover-lab": "node scripts/test-prover-lab.mjs",
+    "prover-lab:node": "node scripts/prover-lab-node.mjs"
   },
   "dependencies": {
     "@midnightntwrk/wallet-sdk": "2.0.0",

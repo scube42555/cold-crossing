@@ -26,3 +26,6 @@ __pycache__/
 # Editors, OS, logs
 .DS_Store
 *.log
+
+# Prover lab experiment: public key files downloaded by scripts/fetch-prover-keys.mjs (large, not source)
+prover-keys/
