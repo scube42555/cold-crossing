@@ -26,7 +26,9 @@
     "fetch:prover-keys": "node scripts/fetch-prover-keys.mjs",
     "build:prover-lab": "tsc && node scripts/build-prover-lab.mjs",
     "test:prover-lab": "node scripts/test-prover-lab.mjs",
-    "prover-lab:node": "node scripts/prover-lab-node.mjs"
+    "prover-lab:node": "node scripts/prover-lab-node.mjs",
+    "hot:zswap-feed": "node dist/hot-zswap-feed.js",
+    "cold:shielded-transfer": "node dist/cold-shielded-transfer.js"
   },
   "dependencies": {
     "@midnightntwrk/wallet-sdk": "2.0.0",

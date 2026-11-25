@@ -238,6 +238,11 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T36 *new* | Hot page: *Take a fresh snapshot and check* reports the transfer as landed | **Not yet run** |
 | T37 *new* | Hot page: a dry run and a *Cancel* at the question submit nothing and leave the sponsor's DUST free; the page and terminal show no token or phrase | **Not yet run** |
 | T38 *new* | `dust-watch <DUST address>` lists the generating NIGHT for a DUST address, and its estimate is close to the balance `sponsor-submit` prints for a sponsor that has not spent recently | Passed on Preprod (2026-11-13) for the listing: Blockfrost served the query, the answer was complete in 5 s, 3 coins listed, one reported as stopped after its NIGHT was spent, estimates consistent with the cap (5 DUST per NIGHT over 7 days). **Comparison with a real balance: not yet run** |
+| T39 *new* | `hot-zswap-feed <tx>...` writes a feed for the cold wallet's transactions, needs no seed, and its own rebuild reaches the tip root | Passed on Preprod (2026-11-25, two wNIGHT transactions of a test wallet, 4.7 KB feed) |
+| T40 *new* | `cold-shielded-transfer --address` prints the cold wallet's shielded address offline; funding it from another wallet works | **Not yet run** |
+| T41 *new* | `cold-shielded-transfer` offline: finds the coins from the feed, shows the plan, proves in WASM, the ledger's verifier accepts, writes `tx.hex` | Core passed offline (throwaway key, locally inserted coin: 1 spend + 2 outputs proved and checked in 214 s); prototype of the same steps passed on Preprod with a test wallet (block 3,578,333). The script itself: **not yet run** |
+| T42 *new* | `sponsor-submit` on a cold shielded `tx.hex`: shows the shielded part, adds DUST, submits, appends the identifier to `cold-shielded-txs.txt`; the next feed shows the change coin | **Not yet run** |
+| T43 *new* | A feed older than 50 minutes is refused by `cold-shielded-transfer`; a tampered feed (pieces that do not reach the tip root) is refused | Passed offline (`npm run test:sdk`, `npm test`) |
 
 **How the new tests are run**
 
@@ -473,6 +478,11 @@ parsing it.
   `hot-inspect` reading a real ledger 9 transaction. Not run: a real `hot-watch` or `sponsor-submit` under the server (long
   first sync, real output, the real prompt), the landing check against the chain, camera input, Firefox (only Chromium tried),
   and mainnet (T34–T37).
+- **Cold shielded spend (section 13): built 2026-11-25, not yet run end to end with these scripts.** What passed: a
+  prototype of the same steps on Preprod (a test wallet's coins rebuilt from a 2.6 KB feed, spend proved in WebAssembly from
+  local key files, sponsor added DUST, `SUCCESS` in block 3,578,333); `hot-zswap-feed` on Preprod (T39); the cold core
+  offline with a throwaway key (T41, T43). Not run: `cold-shielded-transfer` and `sponsor-submit` on a real cold wallet
+  (T40-T42), Tails, mainnet, coins received before the ledger 9 fork (refused by design), more than one input coin.
 - **`dust-watch` (section 12): the listing passed on Preprod (T38, 2026-11-13); the estimate is unconfirmed.** Blockfrost
   serves the `dustGenerations` subscription and ends the stream by itself. The estimate was consistent with the cap but has
   not been compared with the balance a wallet reports. Not run: an address with no registration, the other networks, mainnet.
@@ -893,3 +903,56 @@ real balance is the `Sponsor DUST balance:` line of `sponsor-submit`.
 
 `DUST_WATCH_TIMEOUT_SECONDS` (default 120): how long to wait for the indexer to finish its answer before reporting what
 arrived.
+
+## 13. Shielded spend from the cold machine (zswap feed)
+
+**Status: built 2026-11-25; the steps passed on Preprod as a prototype, the scripts themselves not yet (section 6).**
+
+Sends a shielded token (for example wNIGHT) from the cold wallet's **shielded** address. Nothing secret leaves the cold
+machine, not even a viewing key:
+
+1. **Hot, no key:** `hot-zswap-feed` fetches public data from the indexer and writes `cold-zswap.feed.json`: the raw
+   zswap events of the transactions that touched the cold wallet, a *collapsed update* for every range of the coin tree
+   in between (279 bytes stood for all 71,782 Preprod positions), and the tip block's height, time and tree root. A few KB
+   per transaction, so it fits a QR transfer. Before writing, it rebuilds the tree with a throwaway key and checks the root.
+2. **Cold, offline:** `cold-shielded-transfer` validates the feed, rebuilds the coin tree with the wallet's own keys,
+   finds its coins, checks the root against the tip's, shows the plan, and after `SEND` builds the transfer with the
+   ledger directly and **proves it here** with the zkir WebAssembly prover from local key files (a spend's proof input
+   holds the coin secret key, so it must not go to a proof server). The ledger's verifier checks the result, and
+   `tx.hex` is written without a fee.
+3. **Hot:** `sponsor-submit tx.hex` adds DUST and submits, as for unshielded transfers. For a shielded transfer it
+   appends the transaction identifier to `cold-shielded-txs.txt`, because its change output is a cold coin the next feed
+   must include.
+
+**Which transactions go in the feed.** Every transaction that paid the cold wallet's shielded address, and every one of
+its own shielded spends (those are added by `sponsor-submit`). Add payments in by hand, one hash per line, to
+`cold-shielded-txs.txt` (or `COLD_TX_LIST`), or give them on the command line. The hot machine learns these hashes and
+nothing else. A wrong or extra hash is harmless (the cold machine finds nothing in it). A missing one hides those coins;
+if that makes the cold machine try to spend a coin that is already spent, the network refuses the transaction. Coins
+received before the ledger 9 fork (9 Nov 2026 on Preprod) cannot be spent this way: their events are ledger 8.
+
+**Time limit: one hour.** The ledger accepts a spend's coin-tree root for an hour after the block that produced it
+(3600 s, `zswap/src/ledger.rs`). The feed's tip block starts that hour, so make the feed right before you go to the cold
+machine. `cold-shielded-transfer` sets the expiry 10 minutes before the hour ends and refuses a feed that is already past
+that by its own clock. Proving takes about two minutes per coin spent and per output (measured on an 8-core laptop:
+214 s for 1 spend, the recipient's output and the change; a slower cold machine takes longer).
+
+**Key files.** On the online machine, `npm run fetch:prover-keys` writes `prover-keys/` (8 public files, about 26 MB:
+spend and output circuits, parameters for k = 14 and 15), each checked against the SHA-256 the wallet SDK pins. Copy the
+folder to the cold machine and check it there with `sha256sum -c SHA256SUMS`. The cold script accepts files by hash
+only.
+
+```bash
+# cold, once: the address to fund (shielded; give it to whoever pays you)
+node dist/cold-shielded-transfer.js --address
+# hot: after each payment in, add its transaction hash to cold-shielded-txs.txt; then, right before a spend:
+npm run hot:zswap-feed                       # or: node dist/hot-zswap-feed.js <tx hash> ...
+# cold (copy cold-zswap.feed.json and prover-keys/ over; amount in the token's smallest unit):
+node dist/cold-shielded-transfer.js <recipient mn_shield-addr_...> <amount> --token <64 hex token type>
+# hot (copy tx.hex back):
+npm run hot:sponsor-submit
+```
+
+Settings: `COLD_TX_LIST` (default `cold-shielded-txs.txt`), `FEED_FILE` (default `cold-zswap.feed.json`); options
+`--list`, `--out` (hot), `--feed`, `--keys`, `--out` (cold). The feed and the list are wallet data: `.gitignore` and the
+pre-commit hook keep them out of commits.

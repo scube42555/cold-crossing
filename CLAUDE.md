@@ -10,8 +10,9 @@ machine** syncs, pays the fee and submits. Midnight wallet SDK **2.0.0** (ledger
 
 Flow: the hot machine watches the cold address with its **public key only** (`hot-watch`) and writes a snapshot of its coins. The cold machine restores it, builds,
 signs and finalizes the transfer **itself, offline** (`payFees: false`) and writes `tx.hex` (`cold-transfer`). A separate **sponsor wallet** adds DUST and submits
-(`sponsor-submit`). Files cross the air gap by USB or QR codes. **Shielded transfers are out of scope**: a shielded wallet cannot be watched without its secret
-keys. Do not add them without a design that keeps those keys off the hot machine.
+(`sponsor-submit`). Files cross the air gap by USB or QR codes. **Shielded spends** use the zswap-feed design (README section 13, owner-approved 2026-11-25): the hot
+machine fetches only public data (the cold wallet's listed transactions plus collapsed tree updates) and never any key, not
+even a viewing key; the cold machine rebuilds its coins, proves **locally** in WebAssembly and writes `tx.hex`. Keep it that way.
 
 ## Layout
 
@@ -27,6 +28,7 @@ keys. Do not add them without a design that keeps those keys off the hot machine
 | `src/coldpage/`, `cold-page/cold-page.template.html`, `scripts/build-cold-page.mjs` | **Cold page** `dist/cold-page.html` (README section 10): cold side in a browser, built on the ledger 9 package directly, no wallet SDK wallets. `core.ts` takes the ledger as a parameter (no SDK import at run time); `keys.ts` uses the SDK's HD package; `ui.ts` is browser-only. Two NIGHT transfers passed on Preprod from Tails (T30–T32); README section 6 lists what is not yet run. |
 | `tools/hot_server.py`, `src/hotpage/`, `hot-page/hot-page.template.html`, `scripts/build-hot-page.mjs`, `src/hot-inspect.ts` | **Hot page** (README section 11): a stdlib-Python server on 127.0.0.1 that serves `dist/hot-page.html` and starts `hot-watch` / `sponsor-submit` with fixed arguments. Secrets stay in the server's environment for the scripts to read; the server must never copy, log or return them. `hot-inspect` is read-only (no sync, no secret). Not yet run on a real network. |
 | `src/dust-watch.ts`, `src/dustgen.ts` | `dust-watch <DUST address>` (README section 12): public indexer query for the NIGHT generating DUST for an address, plus an estimate; no seed. `dustgen.ts` is pure (message parsing). The listing passed on Preprod (T38); the estimate is not yet compared with a real balance. |
+| `src/zswapfeed.ts`, `src/coldshielded.ts`, `src/cold-shielded-transfer.ts`, `src/hot-zswap-feed.ts` | **Cold shielded spend** (README section 13). `zswapfeed.ts` is pure (feed format and checks, unit tested); `coldshielded.ts` takes the ledger and zkir as parameters (rebuild, plan, build, prove, check). `cold-shielded-transfer` is offline and proves with local key files only; `hot-zswap-feed` needs no key. `sponsor-submit` appends shielded spends to `cold-shielded-txs.txt`. Prototype passed on Preprod; the scripts are not yet run end to end (T40-T42). |
 | `src/proverlab/`, `prover-lab/`, `scripts/{build,test}-prover-lab.mjs`, `fetch-prover-keys.mjs`, `prover-lab-*.mjs` | **Prover lab, experiment** (`prover-lab/README.md`): `dist/prover-lab.html` proves one shielded output in the browser with the zkir WebAssembly prover, offline, for a throwaway key, and times it. Not part of the cold flow; separate build, so `dist/cold-page.html` is unchanged. Passed in headless Chromium and Node (~1 minute); not yet run on Tails. |
 | `.githooks/pre-commit`, `.gitignore`, `.gitmessage`, `CONTRIBUTING.md` | Keep secrets and wallet data out of commits. |
 
@@ -48,11 +50,11 @@ network; the owner runs secret-bearing steps in their own terminal.
 **The cold machine is offline and holds the seed.**
 - `cold-transfer` must never succeed in reaching a network: every endpoint is an unreachable placeholder, submission is a stub that rejects, and the prover stub
   rejects. Its `facade.start(seeds)` is required by SDK 2 and starts a sync that fails; the `Wallet.Sync` / `API-WS` error lines are expected and harmless.
-- Cold scripts must not import `wallet.ts` or need an indexer or node. The hot machine never receives the cold seed, passphrase or any secret key.
+- Cold scripts must not import `wallet.ts` or need an indexer or node. `cold-shielded-transfer` must also never use a proof server: a spend's proof input holds the coin secret key. The hot machine never receives the cold seed, passphrase or any secret key.
 - Production dependencies are copied to the cold machine and can read the seed. Add few, pin exact versions, prefer zero-dependency pure JS, avoid native add-ons.
   `msgpackr-extract` native files currently ship; whether to drop them is the owner's decision (`--omit=optional` is untested).
 
-**Everything crossing the air gap is untrusted input.** Validate before parsing: `tx.hex` plain hex; snapshots via `inspectSnapshot`; QR frames strict regex, one
+**Everything crossing the air gap is untrusted input.** Validate before parsing: `tx.hex` plain hex; snapshots via `inspectSnapshot`; zswap feeds via `inspectFeed` (and the rebuilt root must equal the tip's); QR frames strict regex, one
 session, SHA-256 check, decompression cap. Do not weaken the cross-checks: `cold-transfer` refuses a snapshot for another network or address, one holding less than
 the amount, or one with **protocol version below 2000000** (`assertLedger9`), and stops unless the facade is `Settled` on ledger 9 (a ledger 8 transaction is refused
 by the network); hot scripts stop if `cold-public.json` names another network. The amount is digits only, smallest unit (1 NIGHT = 1,000,000 STAR). Mainnet needs

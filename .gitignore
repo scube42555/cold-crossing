@@ -15,6 +15,8 @@ cold-public.json
 *.mqr
 *-qr.html
 received-*
+*.feed.json
+cold-shielded-txs.txt
 
 # Cold bundle material: built per machine, large, and not source
 cold-bundle*

@@ -27,6 +27,13 @@ export const pins = {
   files: Object.fromEntries(Object.entries(V9KeyMaterial.files).filter(([name]) => name.startsWith('zswap/output.'))),
   params: Object.fromEntries(Object.entries(V9KeyMaterial.params).map(([k, d]) => [String(k), d])),
 };
+/** The files a shielded transfer needs (cold-shielded-transfer): spend and output circuits. Same SDK pins. */
+export const shieldedPins = {
+  generation: V9KeyMaterial.generation,
+  files: Object.fromEntries(Object.entries(V9KeyMaterial.files).filter(([name]) => /^zswap\/(spend|output)\./.test(name))),
+  params: pins.params,
+};
 export const pinsSource = `${V9KeyMaterial.ledgerRelease.packageName} ${V9KeyMaterial.ledgerRelease.version} (${V9KeyMaterial.ledgerRelease.tag}), circuit generation ${V9KeyMaterial.generation}`;
 
+if (Object.keys(shieldedPins.files).length !== 6) throw new Error(`Expected 6 pinned zswap spend/output files, found ${Object.keys(shieldedPins.files).length}.`);
 if (Object.keys(pins.files).length !== 3) throw new Error(`Expected 3 pinned zswap/output files, found ${Object.keys(pins.files).length}.`);

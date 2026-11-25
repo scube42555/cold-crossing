@@ -1,12 +1,13 @@
-// ONLINE MACHINE ONLY. Downloads the public key files the prover lab needs (zswap output circuit plus its public
-// parameters) from the SDK's key host and keeps only files whose SHA-256 matches the SDK's pins.
+// ONLINE MACHINE ONLY. Downloads the public key files for shielded proving (zswap spend and output circuits plus their
+// public parameters) from the SDK's key host and keeps only files whose SHA-256 matches the SDK's pins. Used by the
+// prover lab page (output only) and cold-shielded-transfer (both).
 //   node scripts/fetch-prover-keys.mjs [folder]     (default: prover-keys/)
 // These files are public (the same ones every proof server downloads); no secret is involved. Copy the folder to the
 // cold machine next to dist/prover-lab.html, and compare SHA256SUMS there with `sha256sum -c SHA256SUMS`.
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { pins, pinsSource } from './prover-lab-pins.mjs';
+import { pinsSource, shieldedPins as pins } from './prover-lab-pins.mjs';
 
 const HOST = 'https://srs.midnight.network/';
 const dir = process.argv[2] ?? 'prover-keys';
@@ -37,11 +38,15 @@ const save = (name, bytes) => {
 const files = {};
 for (const [name, digest] of Object.entries(pins.files)) save(name, (files[name] = await fetchPinned(name, digest)));
 
-// The parameters file depends on the circuit size, read from the circuit itself.
+// The parameters files depend on the circuit sizes, read from the circuits themselves.
 const { Zkir } = await import('@midnightntwrk/zkir-v2');
-const k = Zkir.deserialize(files['zswap/output.bzkir']).getK();
-console.log(`  output circuit: k = ${k}`);
-save(`params/${k}`, await fetchPinned(`params/${k}`, pins.params[String(k)]));
+const ks = new Set();
+for (const c of ['spend', 'output']) {
+  const k = Zkir.deserialize(files[`zswap/${c}.bzkir`]).getK();
+  console.log(`  ${c} circuit: k = ${k}`);
+  ks.add(k);
+}
+for (const k of ks) save(`params/${k}`, await fetchPinned(`params/${k}`, pins.params[String(k)]));
 
 writeFileSync(join(dir, 'SHA256SUMS'), sums.join('\n') + '\n');
 console.log(`Wrote ${dir}/ (${sums.length} files) and ${dir}/SHA256SUMS.`);

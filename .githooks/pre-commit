@@ -14,7 +14,7 @@ problems=0
 report() { printf '  BLOCKED  %s  (%s)\n' "$1" "$2" >&2; problems=$((problems + 1)); }
 
 # 1. File names that must never be committed (added, copied, modified or renamed files only).
-blocked_name='(^|/)(\.env|\.env\.[^/]*|wallet-state-[^/]*\.json|[^/]*\.snapshot\.json|tx\.hex|cold-public\.json|[^/]*\.mqr|received-[^/]*|cold-bundle[^/]*|[^/]*\.tar\.gz|[^/]*\.pem|[^/]*\.key)$'
+blocked_name='(^|/)(\.env|\.env\.[^/]*|wallet-state-[^/]*\.json|[^/]*\.snapshot\.json|tx\.hex|cold-public\.json|[^/]*\.feed\.json|cold-shielded-txs\.txt|[^/]*\.mqr|received-[^/]*|cold-bundle[^/]*|[^/]*\.tar\.gz|[^/]*\.pem|[^/]*\.key)$'
 while IFS= read -r -d '' path; do
   case "$path" in *.env.example | .env.example) continue ;; esac
   if [[ $path =~ $blocked_name ]]; then report "$path" "file name is for wallet data or secrets"; fi

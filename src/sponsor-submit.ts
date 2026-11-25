@@ -13,7 +13,7 @@
 // balanceFinalizedTransaction, signRecipe, finalizeRecipe and submitTransaction exercised end to end.
 import { ADDITIONAL_FEE_OVERHEAD, NETWORK, NETWORK_ID } from './config.js';
 import { checkColdPublicNetwork } from './crosscheck.js';
-import { existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import * as ledgerV9 from '@midnightntwrk/wallet-sdk/ledger/v9';
 import { DustAddress, UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
@@ -81,6 +81,27 @@ if (existsSync(snapshotFile)) {
   } catch (err) {
     console.warn(`Ignoring ${snapshotFile}: ${fmtErr(err)}`);
   }
+}
+
+// A shielded transfer from cold-shielded-transfer: its amounts and addresses are encrypted, so only the shape can be shown.
+// After submission its identifier is added to the cold wallet's transaction list, because its change output is a cold
+// coin that the next zswap feed must include.
+const coldTxList = process.env.COLD_TX_LIST ?? 'cold-shielded-txs.txt';
+let shielded = { spends: 0, outputs: 0 };
+try {
+  const decoded = decodeFinalized(bytes);
+  const offers = [decoded.guaranteedOffer, ...(decoded.fallibleOffer ? [...decoded.fallibleOffer.values()] : [])];
+  for (const o of offers) {
+    if (!o) continue;
+    shielded.spends += o.inputs.length;
+    shielded.outputs += o.outputs.length;
+  }
+  if (shielded.spends + shielded.outputs > 0) {
+    console.log(`Shielded part: ${shielded.spends} coin(s) spent, ${shielded.outputs} output(s). Amounts and addresses are encrypted;`);
+    console.log('               the cold machine showed them before it proved the transaction.');
+  }
+} catch {
+  shielded = { spends: 0, outputs: 0 };
 }
 
 // Show what this transaction does before the slow sync, so you can stop early if it is not what you expect.
@@ -247,6 +268,10 @@ if (dryRun) {
 } else {
   const txId = await submitWithRetry(wallet, finalized);
   console.log(`Submitted transaction ${txId}`);
+  if (shielded.spends > 0) {
+    appendFileSync(coldTxList, `# ${new Date().toISOString()} cold shielded spend (sponsor-submit)\n${txId}\n`, { mode: 0o600 });
+    console.log(`Added it to ${coldTxList}: hot-zswap-feed includes it next time, so the cold wallet sees its change.`);
+  }
 }
 
 await saveWalletState(wallet, stateFile);

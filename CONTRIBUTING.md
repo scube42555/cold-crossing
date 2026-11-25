@@ -85,8 +85,8 @@ Touches-cold: yes
 These run on the machine that holds the seed. A change to any of them gets a second look, a fresh cold bundle, and
 `Touches-cold: yes`:
 
-- `src/` files: `cold-export-public`, `cold-transfer`, `keygen`, `qr-send`, `qr-decode`, and everything they import:
-  `config`, `keys`, `hex`, `mqr`, `mqr-core`, `qr-render`, `redact`, `snapshot`.
+- `src/` files: `cold-export-public`, `cold-transfer`, `cold-shielded-transfer`, `keygen`, `qr-send`, `qr-decode`, and everything
+  they import: `config`, `keys`, `hex`, `mqr`, `mqr-core`, `qr-render`, `redact`, `snapshot`, `coldshielded`, `zswapfeed`, `timefmt`.
 - The cold page (`dist/cold-page.html`): `src/coldpage/`, `cold-page/cold-page.template.html`, `scripts/build-cold-page.mjs`, the
   modules it bundles (`mqr-core`, `snapshot`, `txinfo`, `timefmt`, `hex`), and **every package the build prints as inlined**, including
   the devDependencies `fflate`, `@noble/hashes`, `@scure/base` and `jsqr`: inside the page they run next to the recovery phrase.
