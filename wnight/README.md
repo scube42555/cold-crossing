@@ -51,7 +51,10 @@ npm test
    faucet (https://midnight-tmnight-preprod.nethermind.dev/): B needs DUST to pay
    the redeem fee. The script registers the tNIGHT for DUST and waits for it.
 4. `npm run deploy`
-5. `npm run deposit -- 100`, `npm run transfer -- 100`, `npm run redeem -- 100`
+5. `npm run deposit -- 100`
+6. `npm run transfer -- <B's mn_shield-addr_preprod1...> 100` (B's shielded
+   address is printed by `npm run wallets`; any shielded address works)
+7. `npm run redeem -- 100` (wallet B)
 
 Amounts are tNIGHT; the contract works in STAR (1 tNIGHT = 10^6 STAR).
 

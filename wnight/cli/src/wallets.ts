@@ -11,6 +11,7 @@ import { WebSocket } from 'ws';
 import pino from 'pino';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
+import { MidnightBech32m } from '@midnightntwrk/wallet-sdk';
 import { getConfig, type NetworkConfig } from './config.js';
 import { MidnightWalletProvider, syncWallet, waitForNightThenDust, type WalletSecret } from './wallet.js';
 import { buildProviders, ledgerState, type WnightProviders } from './providers.js';
@@ -75,17 +76,25 @@ function secretFor(label: WalletLabel): WalletSecret {
 }
 
 /**
- * Build, start and sync wallet A or B, then block until it has tNIGHT and
- * spendable DUST. An unfunded wallet prints its address and the faucet URL and
- * waits; its tNIGHT is registered for DUST generation automatically.
+ * Build, start and sync wallet A or B, then make sure it can pay fees.
+ *
+ * Fees are paid in DUST only. A wallet that already holds spendable DUST (for
+ * example DUST designated to it from NIGHT held elsewhere) is ready as is, and
+ * needs no tNIGHT of its own. Otherwise this waits for faucet tNIGHT, prints
+ * the address and faucet URL, registers the tNIGHT for DUST and waits for it.
  */
 export async function openWallet(label: WalletLabel, config = preprodConfig()): Promise<MidnightWalletProvider> {
   const env = envConfig(config);
   const w = await MidnightWalletProvider.build(logger, env, secretFor(label));
   await w.start();
   // A fresh Preprod wallet's first sync takes several minutes.
-  await syncWallet(logger, w.wallet, 30 * 60_000);
-  await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, config.faucet, { label: `wallet ${label}` });
+  const state = await syncWallet(logger, w.wallet, 30 * 60_000);
+  const dust = state.dust.availableCoins.length > 0 ? state.dust.balance(new Date()) : 0n;
+  if (dust > 0n) {
+    logger.info(`wallet ${label}: has ${dust} specks of DUST; no tNIGHT needed to pay fees.`);
+  } else {
+    await waitForNightThenDust(logger, w.wallet, w.unshieldedKeystore, env, config.faucet, { label: `wallet ${label}` });
+  }
   return w;
 }
 
@@ -159,6 +168,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       const w = await openWallet(label, config);
       opened.push(w);
       logger.info(`wallet ${label} unshielded: ${String(w.unshieldedKeystore.getBech32Address())}`);
+      logger.info(`wallet ${label} shielded:   ${MidnightBech32m.encode(config.networkId, w.getShieldedAddress()).asString()}`);
       await logBalances(`wallet ${label}`, w, color);
     }
   });
