@@ -272,6 +272,40 @@ function isProgressStrictlyComplete(progress: unknown): boolean {
   return (candidate.isStrictlyComplete as () => boolean)();
 }
 
+const SYNC_LOG_INTERVAL_MS = Number(process.env['MIDNIGHT_SYNC_LOG_INTERVAL_MS'] ?? 15_000);
+
+/**
+ * How far one part of the wallet has synced, as the same two numbers its
+ * isStrictlyComplete() compares: shielded and DUST progress compare
+ * appliedIndex with highestRelevantWalletIndex, unshielded progress compares
+ * appliedId with highestTransactionId. Returns null if the shape is unknown.
+ */
+function progressNumbers(progress: unknown): { applied: bigint; target: bigint } | null {
+  if (!progress || typeof progress !== 'object') return null;
+  const p = progress as Record<string, unknown>;
+  if (typeof p['appliedIndex'] === 'bigint' && typeof p['highestRelevantWalletIndex'] === 'bigint') {
+    return { applied: p['appliedIndex'], target: p['highestRelevantWalletIndex'] };
+  }
+  if (typeof p['appliedId'] === 'bigint' && typeof p['highestTransactionId'] === 'bigint') {
+    return { applied: p['appliedId'], target: p['highestTransactionId'] };
+  }
+  return null;
+}
+
+/**
+ * "done", "42.3%", or "syncing" when the numbers aren't available. The target
+ * moves as new blocks arrive, so the percentage can briefly dip.
+ */
+export function describeProgress(progress: unknown): string {
+  if (isProgressStrictlyComplete(progress)) return 'done';
+  const n = progressNumbers(progress);
+  if (!n) return 'syncing';
+  if (n.target <= 0n) return '0.0%';
+  // Capped below 100 until the SDK itself reports complete.
+  const permille = n.applied >= n.target ? 999n : (n.applied * 1000n) / n.target;
+  return `${permille / 10n}.${permille % 10n}%`;
+}
+
 export async function syncWallet(
   logger: Logger,
   wallet: WalletFacade,
@@ -279,24 +313,34 @@ export async function syncWallet(
 ): Promise<FacadeState> {
   logger.info('Syncing wallet...');
   let emissionCount = 0;
+  // wnight change: a Preprod sync emits thousands of states. Log at info only
+  // when a part finishes syncing, or every SYNC_LOG_INTERVAL_MS as a heartbeat,
+  // with each part's percentage; every emission goes to trace
+  // (LOG_LEVEL=trace), and the raw progress numbers to debug.
+  let lastFlags = '';
+  let lastLogAt = 0;
   const state = await Rx.firstValueFrom(
     wallet.state().pipe(
       Rx.tap((state: FacadeState) => {
         emissionCount++;
-        const shielded = isProgressStrictlyComplete(state.shielded.progress);
-        const unshielded = isProgressStrictlyComplete(state.unshielded.progress);
-        const dust = isProgressStrictlyComplete(state.dust.progress);
-        logger.info(
-          `Wallet sync [${emissionCount}]: shielded=${shielded}, unshielded=${unshielded}, dust=${dust}`,
-        );
-        if (!shielded) {
-          logger.debug(`  shielded.progress: ${JSON.stringify(state.shielded.progress)}`);
+        const parts = { shielded: state.shielded.progress, unshielded: state.unshielded.progress, dust: state.dust.progress };
+        const flags = Object.values(parts).map(isProgressStrictlyComplete).join();
+        const line =
+          `Wallet sync: ` +
+          Object.entries(parts).map(([name, p]) => `${name} ${describeProgress(p)}`).join(', ') +
+          ` (update ${emissionCount})`;
+        if (flags !== lastFlags || Date.now() - lastLogAt >= SYNC_LOG_INTERVAL_MS) {
+          logger.info(line);
+          lastFlags = flags;
+          lastLogAt = Date.now();
+        } else {
+          logger.trace(line);
         }
-        if (!unshielded) {
-          logger.debug(`  unshielded.progress: ${JSON.stringify(state.unshielded.progress)}`);
-        }
-        if (!dust) {
-          logger.debug(`  dust.progress: ${JSON.stringify(state.dust.progress)}`);
+        if (logger.isLevelEnabled('debug')) {
+          for (const [name, p] of Object.entries(parts)) {
+            const n = progressNumbers(p);
+            if (n) logger.debug(`  ${name}: applied ${n.applied} of ${n.target}`);
+          }
         }
       }),
       Rx.filter(
