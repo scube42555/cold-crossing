@@ -1,0 +1,48 @@
+{
+  "name": "wnight",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "1:1 shielded wrapper for tNIGHT on Midnight (Preprod test project)",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "compile": "compact compile +0.36.1 contract/src/wnight.compact contract/src/managed/wnight",
+    "compile:fast": "compact compile +0.36.1 --skip-zk contract/src/wnight.compact contract/src/managed/wnight",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run",
+    "proof:up": "docker compose up -d --wait proof-server",
+    "proof:down": "docker compose stop proof-server",
+    "wallets": "MIDNIGHT_NETWORK=preprod tsx cli/src/wallets.ts",
+    "deploy": "MIDNIGHT_NETWORK=preprod tsx cli/src/deploy.ts",
+    "deposit": "MIDNIGHT_NETWORK=preprod tsx cli/src/deposit.ts",
+    "transfer": "MIDNIGHT_NETWORK=preprod tsx cli/src/transfer.ts",
+    "redeem": "MIDNIGHT_NETWORK=preprod tsx cli/src/redeem.ts"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-contracts": "5.0.1",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "5.0.1",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "5.0.1",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "5.0.1",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "5.0.1",
+    "@midnight-ntwrk/midnight-js-protocol": "5.0.1",
+    "@midnight-ntwrk/midnight-js-types": "5.0.1",
+    "@midnight-ntwrk/midnight-js-utils": "5.0.1",
+    "@midnight-ntwrk/testkit-js": "5.0.1",
+    "@midnightntwrk/wallet-sdk": "2.0.1",
+    "dotenv": "^16.4.5",
+    "pino": "^9.0.0",
+    "pino-pretty": "^13.0.0",
+    "rxjs": "^7.8.2",
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.9",
+    "tsx": "^4.22.4",
+    "typescript": "^5.7.0",
+    "vite": "6.4.5",
+    "vitest": "^5.0.4"
+  }
+}
