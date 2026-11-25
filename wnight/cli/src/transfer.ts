@@ -7,31 +7,18 @@
 // Check the recipient's balance with their own wallet (for wallet B,
 // `npm run wallets`). From the sender's side, a shielded transfer is
 // confirmed once A's wNIGHT balance drops by the amount sent.
-import { MidnightBech32m, ShieldedAddress } from '@midnightntwrk/wallet-sdk';
+import { MidnightBech32m } from '@midnightntwrk/wallet-sdk';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
 import { waitForShieldedBalance } from '../../contract/src/test/coins.js';
 import {
-  formatNight, loadDeployment, logBalances, logger, openWallet, parseNight, preprodConfig, runScript,
+  formatNight, loadDeployment, logBalances, logger, openWallet, parseNight, parseShieldedAddress, preprodConfig, runScript,
 } from './wallets.js';
 
 const USAGE = 'Usage: npm run transfer -- <mn_shield-addr_preprod1...> [amount in tNIGHT, default 100]';
 
-/** Decode a Bech32m shielded address, refusing any other address kind or network. */
-function parseShieldedAddress(s: string | undefined, networkId: string): ShieldedAddress {
-  if (!s) throw new Error(`Missing recipient shielded address.\n${USAGE}`);
-  try {
-    return ShieldedAddress.codec.decode(networkId, MidnightBech32m.parse(s.trim()));
-  } catch (err) {
-    throw new Error(
-      `'${s}' is not a ${networkId} shielded address (expected mn_shield-addr_${networkId}1...): ` +
-        (err instanceof Error ? err.message : String(err)),
-    );
-  }
-}
-
 await runScript(async (opened) => {
   const config = preprodConfig();
-  const receiverAddress = parseShieldedAddress(process.argv[2], config.networkId);
+  const receiverAddress = parseShieldedAddress(process.argv[2], config.networkId, USAGE);
   const amount = parseNight(process.argv[3] ?? '100');
   if (amount <= 0n) throw new Error('Amount must be greater than zero');
   const { wnightColor } = loadDeployment(config);

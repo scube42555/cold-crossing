@@ -62,6 +62,7 @@ import {
 import * as Rx from 'rxjs';
 import { Option } from 'effect';
 import { findDustForkStart, type DustForkStart } from './dustFork.js';
+import { useWasmProver } from './wasmProver.js';
 import type { Logger } from 'pino';
 
 // A proven, not yet bound ledger 9 transaction: what a contract call or deploy
@@ -255,6 +256,7 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
     const forkStart = env.networkId === 'undeployed' ? undefined : await findDustForkStart(logger, env);
     if (forkStart) useDustForkStart(builder, forkStart);
     else skipLedgerV8DustHistory(builder);
+    if (process.env['MIDNIGHT_PROVER'] === 'wasm') useWasmProver(builder, logger);
 
     const built = await builder.buildWithoutStarting();
     const { seeds, keystore } = built;

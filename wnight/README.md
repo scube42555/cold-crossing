@@ -58,6 +58,21 @@ npm test
 
 Amounts are tNIGHT; the contract works in STAR (1 tNIGHT = 10^6 STAR).
 
+### Proving without a proof server (WASM)
+
+`npm run wasm-transfer -- [amount] [shielded address]` sends wNIGHT from wallet B
+(default 1 wNIGHT, to B itself) and makes **every proof in-process with the
+wallet SDK's WebAssembly prover**: the prover a browser on an offline machine
+would run. It prints the build and proving time and what was proved, then waits
+for the transaction on chain. `MIDNIGHT_PROVER=wasm` switches any script's
+wallet proofs to it; contract-call proofs (deposit, redeem) still use the proof
+server. Key files come from the SDK's key host, checked against its pinned hashes.
+
+Measured 25 Nov 2026 (Node 26, 8-core Linux laptop, Preprod): a self-transfer
+with 1 shielded spend, 2 outputs and 1 DUST spend proved in **249 s** and was
+accepted (block 3,578,130, status SUCCESS). A single shielded output takes about
+50-60 s in WASM (cold-hot project, prover lab).
+
 ## Known limits and open points
 
 - The simulator does not balance transactions or track nullifiers. That the

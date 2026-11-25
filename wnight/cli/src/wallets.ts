@@ -11,7 +11,7 @@ import { WebSocket } from 'ws';
 import pino from 'pino';
 import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
-import { MidnightBech32m } from '@midnightntwrk/wallet-sdk';
+import { MidnightBech32m, ShieldedAddress } from '@midnightntwrk/wallet-sdk';
 import { getConfig, type NetworkConfig } from './config.js';
 import { MidnightWalletProvider, syncWallet, waitForNightThenDust, type WalletSecret } from './wallet.js';
 import { buildProviders, ledgerState, type WnightProviders } from './providers.js';
@@ -52,6 +52,19 @@ export function preprodConfig(): NetworkConfig {
   const config = getConfig();
   if (config.networkId !== 'preprod') throw new Error(`Refusing network id '${config.networkId}'.`);
   return config;
+}
+
+/** Decode a Bech32m shielded address, refusing any other address kind or network. */
+export function parseShieldedAddress(s: string | undefined, networkId: string, usage: string): ShieldedAddress {
+  if (!s) throw new Error(`Missing recipient shielded address.\n${usage}`);
+  try {
+    return ShieldedAddress.codec.decode(networkId, MidnightBech32m.parse(s.trim()));
+  } catch (err) {
+    throw new Error(
+      `'${s}' is not a ${networkId} shielded address (expected mn_shield-addr_${networkId}1...): ` +
+        (err instanceof Error ? err.message : String(err)),
+    );
+  }
 }
 
 export function envConfig(config: NetworkConfig): EnvironmentConfiguration {
