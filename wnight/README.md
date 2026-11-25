@@ -70,3 +70,8 @@ Amounts are tNIGHT; the contract works in STAR (1 tNIGHT = 10^6 STAR).
   deposit and a redeem of the same round amount can be linked. Only the
   wallet-to-wallet hop is private.
 - NIGHT locked in the contract no longer generates DUST for the depositor.
+- First wallet sync on Preprod: the shielded part takes minutes, DUST about
+  2 hours (measured with a fresh wallet via Blockfrost). DUST starts at the
+  ledger 9 fork thanks to `cli/src/dustFork.ts`; without it the SDK's own
+  fork search times out on Blockfrost and DUST replays from genesis (~1 day).
+  Progress is saved every 5 minutes and on Ctrl-C, so a run can be resumed.

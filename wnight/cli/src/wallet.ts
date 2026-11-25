@@ -60,6 +60,8 @@ import {
   logger as testkitLogger,
 } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
+import { Option } from 'effect';
+import { findDustForkStart, type DustForkStart } from './dustFork.js';
 import type { Logger } from 'pino';
 
 // A proven, not yet bound ledger 9 transaction: what a contract call or deploy
@@ -247,7 +249,12 @@ export class MidnightWalletProvider implements Ledger9WalletProvider {
         ? base.withMnemonic(secret.value)
         : base.withSeed(secret.value);
 
-    skipLedgerV8DustHistory(builder);
+    // wnight change: start a fresh wallet's DUST sync at the ledger 9 fork
+    // using a fork point found with patient retries and cached (see
+    // dustFork.ts); the SDK's own search times out against Blockfrost.
+    const forkStart = env.networkId === 'undeployed' ? undefined : await findDustForkStart(logger, env);
+    if (forkStart) useDustForkStart(builder, forkStart);
+    else skipLedgerV8DustHistory(builder);
 
     const built = await builder.buildWithoutStarting();
     const { seeds, keystore } = built;
@@ -346,6 +353,17 @@ export async function syncWallet(
   try {
     state = await Rx.firstValueFrom(
       wallet.state().pipe(
+        // wnight fix: a stall timeout. It must come before the filter below,
+        // which only lets the final synced state through; placed after it (as
+        // in the upstream example) `each` measured the total sync time, and a
+        // healthy multi-hour Preprod sync was killed after `timeout`.
+        Rx.timeout({
+          each: timeout,
+          with: () =>
+            Rx.throwError(
+              () => new Error(`Wallet sync stalled: no update for ${timeout}ms (${emissionCount} updates received)`),
+            ),
+        }),
         Rx.tap((state: FacadeState) => {
           emissionCount++;
           const parts = { shielded: state.shielded.progress, unshielded: state.unshielded.progress, dust: state.dust.progress };
@@ -375,13 +393,6 @@ export async function syncWallet(
             isProgressStrictlyComplete(state.unshielded.progress),
         ),
         Rx.tap(() => logger.info(`Wallet sync complete after ${emissionCount} emissions`)),
-        Rx.timeout({
-          each: timeout,
-          with: () =>
-            Rx.throwError(
-              () => new Error(`Wallet sync timeout after ${timeout}ms (${emissionCount} emissions received)`),
-            ),
-        }),
         Rx.catchError((err) => {
           logger.error(`Wallet sync error: ${err}`);
           return Rx.throwError(() => err);
@@ -490,6 +501,19 @@ function stateFileFor(networkId: string, masterSeed: string): string | undefined
  */
 function skipLedgerV8DustHistory(builder: FluentWalletBuilder): void {
   (builder as unknown as { config: { skipLedgerV8DustHistory?: boolean } }).config.skipLedgerV8DustHistory = true;
+}
+
+/**
+ * wnight: give the DUST wallet a known ledger 9 start instead of its own
+ * search. `dustTimelineStartProbe` is the SDK hook the search feeds; the SDK
+ * only overrides it when `skipLedgerV8DustHistory` is on, so that is turned
+ * off. Like the search, it is read by fresh starts only.
+ */
+function useDustForkStart(builder: FluentWalletBuilder, start: DustForkStart): void {
+  const config = (builder as unknown as { config: Record<string, unknown> }).config;
+  config['skipLedgerV8DustHistory'] = false;
+  config['dustTimelineStartProbe'] = async () =>
+    Option.some({ cursor: start.cursor, version: ProtocolVersion.ProtocolVersion(start.version) });
 }
 
 /** The three sub-wallets restored from a snapshot, configured as testkit's WalletFactory configures new ones. */
