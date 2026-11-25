@@ -326,6 +326,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    cd "$PROJECT"
    npm ci                              # all dependencies, including dev, from the lockfile
    npm run build                       # writes dist/, dist/receiver.html and dist/cold-page.html
+   npm run fetch:prover-keys           # prover-keys/: 8 public files (~26 MB) for shielded spends (section 13)
    ```
 
 3. **Assemble a clean bundle.** It holds only production dependencies, so `typescript` and `jsqr` stay out of the offline machine.
@@ -337,6 +338,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    cp package.json package-lock.json "$BUNDLE/midnight-cold-hot/"
    cp -r dist "$BUNDLE/midnight-cold-hot/"
    cp README.md "$BUNDLE/midnight-cold-hot/"
+   cp -r prover-keys "$BUNDLE/midnight-cold-hot/"    # only needed for shielded spends (section 13)
    cd "$BUNDLE/midnight-cold-hot"
    npm ci --omit=dev --ignore-scripts
    find node_modules \( -name '*.node' -o -name '*.so' \)    # expect no output
@@ -356,6 +358,8 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    NODE=/tmp/ct/node-v22.23.4-linux-x64/bin/node
    rm -rf /tmp/ct/test && cp -r "$BUNDLE/midnight-cold-hot" /tmp/ct/test && cd /tmp/ct/test
    COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-export-public.js
+   # shielded spends (section 13): prints a mn_shield-addr_... address, offline
+   COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-shielded-transfer.js --address
    ```
 
    `unshare -rn` runs it in a network namespace with no network. If it says "Operation not permitted", use `sudo unshare -n`
@@ -394,6 +398,7 @@ Only `cold-bundle.tar.gz`. It contains:
 | `midnight-cold-hot/package-lock.json` | Records exact versions |
 | `midnight-cold-hot/dist/` | The compiled scripts and `receiver.html` |
 | `midnight-cold-hot/node_modules/` | Production dependencies only |
+| `midnight-cold-hot/prover-keys/` | Public proving keys for shielded spends (section 13), with `SHA256SUMS`. Only if you spend shielded coins |
 | `midnight-cold-hot/tools/` | `qr_scan.py`, the Python QR scanner. Only if you use it |
 | `midnight-cold-hot/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
 | `midnight-cold-hot/README.md` | These instructions, to read on the cold machine |
@@ -415,6 +420,8 @@ cd midnight-cold-hot
 node -e "import('@midnightntwrk/wallet-sdk/ledger/v9').then(() => console.log('ledger loads'))"
 # with the Python scanner:
 PYTHONPATH=pylibs python3 -c "import cv2, numpy; print(cv2.__version__)"
+# for shielded spends: every key file must say OK
+(cd prover-keys && sha256sum -c SHA256SUMS)
 ```
 
 Run everything from your home folder. On Tails it is in RAM, so you copy the bundle again after each reboot unless you use
