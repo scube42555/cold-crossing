@@ -31,6 +31,7 @@ Key files are accepted by **hash**, not name: only files whose SHA-256 matches `
 |---|---|---|---|---|---|
 | 2026-11-25 | Node 22, Linux laptop, 8 logical CPUs | 49–60 s (3 runs) | 65–222 ms | RSS ~455 MiB | `prover-lab:node` |
 | 2026-11-25 | Headless Chromium 158, same machine, `file://` page | 59.6 s | 257 ms | WebAssembly 223 MiB, JS heap 61 MiB | `test:prover-lab`, no network requests |
+| 2026-11-25 | Node 26, same laptop, **full shielded transfer on Preprod** (wnight project, `npm run wasm-transfer`) | 249 s for 1 spend + 2 outputs + 1 DUST spend (parallel workers) | accepted on chain: block 3,578,130, SUCCESS | not measured | Real wNIGHT coin; SDK `provers: { v9: { kind: 'wasm' } }`; 18.5 KB transaction |
 | | Tails, real offline machine | not yet run | | | |
 
 Also checked once (ad hoc, not in the repo): flipping single bytes of a proven transaction made the ledger reject every
@@ -40,7 +41,8 @@ one that still parsed (397 of 397) with `Invalid proof -- while verifying Zswap 
 
 - **Spend proofs** (zswap `spend`, 11 MB prover key): one per shielded coin spent; each needs the coin's Merkle path from a
   hot-side snapshot, and the spend witness contains the coin secret key, so it must be proved on the cold machine.
-- A transfer is typically 1 spend + 2 outputs (recipient, change): expect several minutes at these speeds.
+- A transfer is typically 1 spend + 2 outputs (recipient, change), plus a DUST spend unless a sponsor pays: measured
+  249 s for all four under Node on the laptop above (wnight project). Expect more on a slower cold machine.
 - **Time limit:** the ledger accepts a spend against a coin-tree root for one hour after the block that produced it
   (`past_roots` filter, 3600 s, in `zswap/src/ledger.rs`), so snapshot → prove → sponsor → inclusion must fit in that hour.
 - Watching a shielded wallet needs its viewing key on the hot machine (CLAUDE.md: needs a design first).
