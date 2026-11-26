@@ -1,6 +1,6 @@
 # Merge plan: wnight into midnight-cold-hot
 
-Status: **proposal, 2026-11-25. Nothing has moved yet.** Every decision marked *(owner)* needs the owner's answer first.
+Status: **proposal, 2026-11-25. Nothing has moved yet.** The owner's decisions (history, name) were made on 2026-11-26.
 
 ## 1. Goal and what is possible today
 
@@ -40,9 +40,7 @@ The two state formats cannot read each other. That is why cold-hot's `sponsor-su
 1. **Base repository: midnight-cold-hot.** Recommended.
    - It has the stricter rules (CLAUDE.md, the pre-commit hook, wallet-data names, the `Verified:` and `Touches-cold:` trailers), the test plan and the cold bundle.
    - Its rules then apply to wnight's code too. That costs wnight some looseness (no `git add -A`, no secrets in `.env` files that the hook blocks).
-2. **History** *(owner)*:
-   - Keep wnight's history with `git merge --allow-unrelated-histories` of a branch where wnight is already moved into its subfolder. Recommended.
-   - Or copy the files in one commit that names wnight's last hash.
+2. **History** (owner, decided 2026-11-26): **keep wnight's history.** wnight is first moved into its subfolder on a branch of its own repo, then merged here with `git merge --allow-unrelated-histories`, so `git log --follow` reaches its old commits.
 3. **Packages: npm workspaces, one lockfile.**
    - The cold bundle must not grow by wnight's ~450 MB of Midnight.js and testkit, which the cold machine never needs.
    - So the bundle is built from the cold package's own dependency set (`npm ci --omit=dev -w packages/cold`, to verify in phase 1). There is a check that `packages/cold` does not import `packages/hot`, `packages/wnight-cli`, or any network client.
@@ -52,7 +50,7 @@ The two state formats cannot read each other. That is why cold-hot's `sponsor-su
    - The contract package keeps vitest for its simulator tests, as a dev dependency only.
    - The wnight CLI keeps pino for now; it is online and dev-only.
 6. **One saved-state format** (section 4.2). Old files are read once and rewritten.
-7. **Name** *(owner)*: keep `midnight-cold-hot`, or rename (for example `midnight-cold-wallet`). A rename is one commit plus the bundle paths in the README.
+7. **Name** (owner, decided 2026-11-26): **`cold-crossing`**, for now. It names the cold keys and the Cardano-Midnight round trip without tying the project to a bridge design. The rename happens in phase 1 together with the merge: the repo and folder name, the package names, the bundle paths in the README and CLAUDE.md.
 
 ## 3. Target layout
 
@@ -172,7 +170,7 @@ Each phase ends with every suite green and an entry in the test plan.
 | Phase | Work | Done when |
 |---|---|---|
 | 0 Baseline | Finish T40–T45 on the current two projects; note both last commits | T40–T45 have results |
-| 1 Repo merge, no behaviour change | wnight in as `packages/contract` and `packages/wnight-cli`, cold-hot `src/` split into `core`/`cold`/`hot`; workspaces; cold bundle from `packages/cold` only; import-boundary check in the pre-commit hook or a test | all existing suites pass; bundle builds and passes section 5's offline checks; wnight CLI runs a Preprod `wallets` |
+| 1 Repo merge, no behaviour change | rename to `cold-crossing`; wnight in as `packages/contract` and `packages/wnight-cli`, cold-hot `src/` split into `core`/`cold`/`hot`; workspaces; cold bundle from `packages/cold` only; import-boundary check in the pre-commit hook or a test | all existing suites pass; bundle builds and passes section 5's offline checks; wnight CLI runs a Preprod `wallets` |
 | 2 One SDK version | 4.1 | suites pass; one Preprod unshielded transfer and one shielded transfer |
 | 3 One wallet layer | 4.2–4.4; state migration script; delete duplicates | wnight CLI and sponsor share state; a sponsor synced by either is resumed by the other |
 | 4 Spike | section 5 questions 1–4, throwaway wallets on Preprod | written answers and timings; go/no-go on cold contract proving |
