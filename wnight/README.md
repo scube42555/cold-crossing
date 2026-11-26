@@ -58,6 +58,15 @@ npm test
 
 Amounts are tNIGHT; the contract works in STAR (1 tNIGHT = 10^6 STAR).
 
+**Sync ahead.** Each script syncs only its own wallet, and saves it to
+`.wallet-state/`. When a script starts and the *other* wallet has never been
+synced here (or not for over a day), it says so up front, so that the slow sync
+can run now instead of at the step that needs it: run
+`npm run wallets -- B` (or `-- A`) in a second terminal. That is safe while
+the first script uses only the other wallet; never run two scripts on the
+same wallet at once. `MIDNIGHT_SYNC_LOG_INTERVAL_MS` (default 15000) sets how
+often a sync prints its progress.
+
 ### Proving without a proof server (WASM)
 
 `npm run wasm-transfer -- [amount] [shielded address]` sends wNIGHT from wallet B

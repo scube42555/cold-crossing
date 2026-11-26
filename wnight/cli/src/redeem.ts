@@ -6,7 +6,7 @@ import { encodeUserAddress } from '@midnight-ntwrk/midnight-js-protocol/v9/compa
 import { CompiledWnight, type Contract } from '../../contract/src/index.js';
 import { freshCoin } from '../../contract/src/test/coins.js';
 import {
-  NIGHT_RAW, formatNight, loadDeployment, logBalances, logLedger, logger, openWallet, parseNight,
+  NIGHT_RAW, formatNight, loadDeployment, logBalances, logLedger, logger, openWallet, warnIfOtherWalletUnsynced, parseNight,
   preprodConfig, providersFor, readLedger, runScript,
 } from './wallets.js';
 
@@ -14,6 +14,7 @@ await runScript(async (opened) => {
   const amount = parseNight(process.argv[2] ?? '100');
   const config = preprodConfig();
   const { contractAddress, wnightColor } = loadDeployment(config);
+  warnIfOtherWalletUnsynced('B', config);
   const b = await openWallet('B', config);
   opened.push(b);
   const providers = providersFor(b, config);

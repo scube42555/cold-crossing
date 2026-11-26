@@ -3,10 +3,11 @@
 import { deployContract } from '@midnight-ntwrk/midnight-js-contracts';
 import { CompiledWnight, pureCircuits } from '../../contract/src/index.js';
 import { tokenColor } from '../../contract/src/test/coins.js';
-import { logLedger, logger, openWallet, preprodConfig, providersFor, readLedger, runScript, saveDeployment } from './wallets.js';
+import { logLedger, logger, openWallet, warnIfOtherWalletUnsynced, preprodConfig, providersFor, readLedger, runScript, saveDeployment } from './wallets.js';
 
 await runScript(async (opened) => {
   const config = preprodConfig();
+  warnIfOtherWalletUnsynced('A', config);
   const a = await openWallet('A', config);
   opened.push(a);
   const providers = providersFor(a, config);

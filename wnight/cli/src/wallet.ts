@@ -14,7 +14,7 @@
 // limitations under the License.
 
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -57,6 +57,7 @@ import {
   type DustWalletOptions,
   type EnvironmentConfiguration,
   FluentWalletBuilder,
+  WalletSeeds as TestkitWalletSeeds,
   logger as testkitLogger,
 } from '@midnight-ntwrk/testkit-js';
 import * as Rx from 'rxjs';
@@ -488,6 +489,28 @@ function stateFileFor(networkId: string, masterSeed: string): string | undefined
   if (networkId === 'undeployed' || process.env['MIDNIGHT_WALLET_STATE'] === 'off') return undefined;
   const id = createHash('sha256').update(masterSeed).digest('hex').slice(0, 16);
   return join(STATE_DIR, `${networkId}-${id}.json`);
+}
+
+/**
+ * What is saved for a wallet, without building or syncing it: the state file and, when there is one, when it was
+ * saved and at which block. Undefined where saving is off. Used to warn early that a later step will need a sync.
+ */
+export function savedStateFor(
+  networkId: string,
+  secret: WalletSecret,
+): { file: string; savedAt?: Date; height?: number } | undefined {
+  // The same master seed the builder derives (testkit's withMnemonic / withSeed), so the same file name.
+  const masterSeed = secret.kind === 'mnemonic' ? TestkitWalletSeeds.fromMnemonic(secret.value).masterSeed : secret.value;
+  const file = stateFileFor(networkId, masterSeed);
+  if (!file) return undefined;
+  if (!existsSync(file)) return { file };
+  const savedAt = statSync(file).mtime;
+  try {
+    const saved = JSON.parse(readFileSync(file, 'utf8')) as SavedWalletState;
+    return { file, savedAt, height: saved.version === 2 ? saved.chain.height : undefined };
+  } catch {
+    return { file, savedAt };
+  }
 }
 
 /**

@@ -11,7 +11,7 @@ import { MidnightBech32m } from '@midnightntwrk/wallet-sdk';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
 import { waitForShieldedBalance } from '../../contract/src/test/coins.js';
 import {
-  formatNight, loadDeployment, logBalances, logger, openWallet, parseNight, parseShieldedAddress, preprodConfig, runScript,
+  formatNight, loadDeployment, logBalances, logger, openWallet, warnIfOtherWalletUnsynced, parseNight, parseShieldedAddress, preprodConfig, runScript,
 } from './wallets.js';
 
 const USAGE = 'Usage: npm run transfer -- <mn_shield-addr_preprod1...> [amount in tNIGHT, default 100]';
@@ -23,6 +23,7 @@ await runScript(async (opened) => {
   if (amount <= 0n) throw new Error('Amount must be greater than zero');
   const { wnightColor } = loadDeployment(config);
 
+  warnIfOtherWalletUnsynced('A', config);
   const a = await openWallet('A', config);
   opened.push(a);
 

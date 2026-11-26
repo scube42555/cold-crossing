@@ -1,8 +1,9 @@
 // Shared setup for the CLI scripts: Preprod-only guard, wallets A and B from
 // .env, DUST registration, providers, and the saved deployment.
 //
-// Run directly (`npm run wallets`) to print both wallets' addresses and
-// balances, registering their tNIGHT for DUST if needed.
+// Run directly (`npm run wallets`, or `npm run wallets -- B` for one) to print
+// the wallets' addresses and balances, registering their tNIGHT for DUST if
+// needed. Each run saves the synced state, so later scripts start quickly.
 
 import 'dotenv/config';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -13,7 +14,7 @@ import { type EnvironmentConfiguration } from '@midnight-ntwrk/testkit-js';
 import { unshieldedToken } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { MidnightBech32m, ShieldedAddress } from '@midnightntwrk/wallet-sdk';
 import { getConfig, type NetworkConfig } from './config.js';
-import { MidnightWalletProvider, syncWallet, waitForNightThenDust, type WalletSecret } from './wallet.js';
+import { MidnightWalletProvider, savedStateFor, syncWallet, waitForNightThenDust, type WalletSecret } from './wallet.js';
 import { buildProviders, ledgerState, type WnightProviders } from './providers.js';
 import { ledger, zkConfigPath, type Ledger } from '../../contract/src/index.js';
 
@@ -111,6 +112,36 @@ export async function openWallet(label: WalletLabel, config = preprodConfig()): 
   return w;
 }
 
+/** What a later step does with each wallet, for the early sync warning. */
+const LATER_USE: Record<WalletLabel, string> = {
+  A: 'deploy, deposit, consolidate and transfer use wallet A',
+  B: 'redeem and wasm-transfer use wallet B',
+};
+const DAY_MS = 24 * 3600_000;
+
+/**
+ * Warn at the start of a script when the OTHER wallet would need a long sync in a later step: it has no saved state
+ * (a first sync on Preprod takes minutes to hours) or the saved state is over a day old. The sync can then run now,
+ * in another terminal, while this script works with its own wallet. Silent when that wallet is not set in .env.
+ */
+export function warnIfOtherWalletUnsynced(using: WalletLabel, config = preprodConfig()): void {
+  const other: WalletLabel = using === 'A' ? 'B' : 'A';
+  let info: ReturnType<typeof savedStateFor>;
+  try {
+    info = savedStateFor(config.networkId, secretFor(other));
+  } catch {
+    return; // wallet not configured: nothing later can use it either
+  }
+  if (!info) return; // saving is off
+  const how = `Sync it now in another terminal (safe: this run uses only wallet ${using}): npm run wallets -- ${other}`;
+  if (!info.savedAt) {
+    logger.warn(`Wallet ${other} has never been synced here (no saved state). Later steps (${LATER_USE[other]}) will first sync it from scratch, which takes minutes to hours on Preprod. ${how}`);
+  } else if (Date.now() - info.savedAt.getTime() > DAY_MS) {
+    const days = ((Date.now() - info.savedAt.getTime()) / DAY_MS).toFixed(1);
+    logger.info(`Wallet ${other} was last synced ${days} days ago${info.height ? ` (block ${info.height})` : ''}; its next use (${LATER_USE[other]}) catches up first. ${how}`);
+  }
+}
+
 export function providersFor(w: MidnightWalletProvider, config: NetworkConfig): WnightProviders {
   return buildProviders(w, zkConfigPath, config);
 }
@@ -172,12 +203,16 @@ export async function runScript(main: (opened: MidnightWalletProvider[]) => Prom
   }
 }
 
-// `npm run wallets`: show both wallets, funding and registering DUST as needed.
+// `npm run wallets [-- A|B]`: show the wallets, funding and registering DUST as needed.
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await runScript(async (opened) => {
     const config = preprodConfig();
     const color = existsSync(DEPLOYMENT_FILE) ? loadDeployment(config).wnightColor : undefined;
-    for (const label of ['A', 'B'] as const) {
+    // `npm run wallets -- B` syncs only B (for example while another script uses A).
+    const asked = process.argv.slice(2).map((a) => a.toUpperCase());
+    if (asked.some((a) => a !== 'A' && a !== 'B')) throw new Error('Usage: npm run wallets [-- A | B]');
+    const labels = (['A', 'B'] as const).filter((l) => asked.length === 0 || asked.includes(l));
+    for (const label of labels) {
       const w = await openWallet(label, config);
       opened.push(w);
       logger.info(`wallet ${label} unshielded: ${String(w.unshieldedKeystore.getBech32Address())}`);

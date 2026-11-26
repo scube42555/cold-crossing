@@ -5,7 +5,7 @@ import { submitCallTx } from '@midnight-ntwrk/midnight-js-contracts';
 import { CompiledWnight, type Contract } from '../../contract/src/index.js';
 import { waitForShieldedBalance } from '../../contract/src/test/coins.js';
 import {
-  formatNight, loadDeployment, logBalances, logLedger, logger, openWallet, parseNight,
+  formatNight, loadDeployment, logBalances, logLedger, logger, openWallet, warnIfOtherWalletUnsynced, parseNight,
   preprodConfig, providersFor, readLedger, runScript,
 } from './wallets.js';
 
@@ -14,6 +14,7 @@ await runScript(async (opened) => {
   if (amount <= 0n || amount >= 2n ** 64n) throw new Error('Amount must be > 0 and fit in Uint<64> STAR');
   const config = preprodConfig();
   const { contractAddress, wnightColor } = loadDeployment(config);
+  warnIfOtherWalletUnsynced('A', config);
   const a = await openWallet('A', config);
   opened.push(a);
   const providers = providersFor(a, config);

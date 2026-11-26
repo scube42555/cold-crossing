@@ -12,7 +12,7 @@ import { MidnightBech32m } from '@midnightntwrk/wallet-sdk';
 import { Transaction } from '@midnight-ntwrk/midnight-js-protocol/v9';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
 import {
-  formatNight, loadDeployment, logBalances, logger, openWallet, parseNight, parseShieldedAddress, preprodConfig, runScript,
+  formatNight, loadDeployment, logBalances, logger, openWallet, warnIfOtherWalletUnsynced, parseNight, parseShieldedAddress, preprodConfig, runScript,
 } from './wallets.js';
 import { resetWasmProofEvents, wasmProofEvents } from './wasmProver.js';
 
@@ -26,6 +26,7 @@ await runScript(async (opened) => {
   if (amount <= 0n) throw new Error('Amount must be greater than zero');
   const { wnightColor } = loadDeployment(config);
 
+  warnIfOtherWalletUnsynced('B', config);
   const b = await openWallet('B', config);
   opened.push(b);
   const own = b.getShieldedAddress();
@@ -38,6 +39,13 @@ await runScript(async (opened) => {
   logger.info(`wallet B: ${formatNight(have)} wNIGHT in ${coins.length} coin(s): ${coins.map((c) => formatNight(c.coin.value)).join(', ')}`);
   if (have < amount) throw new Error(`Wallet B holds ${formatNight(have)} wNIGHT, less than ${formatNight(amount)}`);
   logger.info(`Sending ${formatNight(amount)} wNIGHT ${toSelf ? 'from B to itself' : `to ${process.argv[3]}`} (shielded; fee from B's DUST).`);
+  if (!toSelf) {
+    // Early, so the slow sync can run while this proves: the cold-hot shielded flow ends with sponsor-submit.
+    logger.info(
+      "If this pays a cold wallet for midnight-cold-hot's shielded flow: that flow ends with sponsor-submit, which needs the " +
+        'sponsor wallet synced. Start `npm run hot:sponsor-sync` in the midnight-cold-hot folder now, so it is ready.',
+    );
+  }
 
   resetWasmProofEvents();
   const t0 = performance.now();

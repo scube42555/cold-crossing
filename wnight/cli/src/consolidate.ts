@@ -10,7 +10,7 @@
 // exactly `amount` (plus change), and a deposit of that amount spends just it.
 import * as Rx from 'rxjs';
 import { ttlOneHour } from '@midnight-ntwrk/midnight-js-utils';
-import { NIGHT_RAW, formatNight, logger, openWallet, parseNight, preprodConfig, runScript } from './wallets.js';
+import { NIGHT_RAW, formatNight, logger, openWallet, warnIfOtherWalletUnsynced, parseNight, preprodConfig, runScript } from './wallets.js';
 
 const values = (coins: readonly { utxo: { value: bigint } }[]) =>
   coins.map((c) => c.utxo.value).sort((x, y) => (x < y ? -1 : x > y ? 1 : 0));
@@ -19,6 +19,7 @@ await runScript(async (opened) => {
   const amount = parseNight(process.argv[2] ?? '100');
   if (amount <= 0n) throw new Error('Amount must be greater than zero');
   const config = preprodConfig();
+  warnIfOtherWalletUnsynced('A', config);
   const a = await openWallet('A', config);
   opened.push(a);
 
