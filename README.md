@@ -398,7 +398,7 @@ tar -xzf node-v22.23.4-linux-x64.tar.gz
 export PATH="$PWD/node-v22.23.4-linux-x64/bin:$PATH"
 node --version                          # v22.23.4
 cd midnight-cold-hot
-node -e "import('@midnight-ntwrk/midnight-js-protocol/ledger').then(() => console.log('ledger loads'))"
+node -e "import('@midnightntwrk/wallet-sdk/ledger/v9').then(() => console.log('ledger loads'))"
 # with the Python scanner:
 PYTHONPATH=pylibs python3 -c "import cv2, numpy; print(cv2.__version__)"
 ```
