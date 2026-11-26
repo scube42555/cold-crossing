@@ -12,6 +12,9 @@ button { font: inherit; padding: 6px 14px; margin: 4px 6px 4px 0; }
 #grid { display: flex; flex-wrap: wrap; gap: 3px; margin: 10px 0; }
 #grid span { width: 14px; height: 14px; border: 1px solid #888; border-radius: 2px; }
 #grid span.got { background: #2a9d4b; border-color: #2a9d4b; }
+/* The frame the camera read last, received or not: shows where the sender's loop is. */
+#grid span.now { outline: 3px solid #e8a317; outline-offset: 1px; }
+#where { font-variant-numeric: tabular-nums; }
 #status { font-weight: 600; }
 #warn { color: #b3261e; }
 textarea { width: 100%; height: 7rem; font: 12px ui-monospace, monospace; }
@@ -28,6 +31,7 @@ used once. When every frame is in, a file is offered for download. This page wor
 <p id="status">Not started.</p>
 <p id="warn"></p>
 <div id="grid"></div>
+<p id="where"></p>
 <div>
   <button id="start" type="button">Start camera</button>
   <button id="reset" type="button">Reset</button>
@@ -78,12 +82,22 @@ used once. When every frame is in, a file is offered for download. This page wor
   function hex(bytes) {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   }
+  // The sender shows frames 1..total in order and loops. After frame `seen`, how many frames until the next missing one
+  // comes round (1 = the very next frame), or 0 when nothing is missing.
+  function framesUntilMissing(seen, total, has) {
+    for (let step = 1; step <= total; step++) {
+      const i = ((seen - 1 + step) % total) + 1;
+      if (!has(i)) return { index: i, step };
+    }
+    return null;
+  }
   // END PURE
 
   const $ = (id) => document.getElementById(id);
   let stream = null;
   let timer = null;
   let current = null; // { kind, session, total, hash, frames: Map(index -> raw line) }
+  let lastSeen = 0; // index of the frame the camera read last, received before or not (0: none yet)
 
   function say(text) { $('status').textContent = text; }
   function warn(text) { $('warn').textContent = text; }
@@ -95,12 +109,35 @@ used once. When every frame is in, a file is offered for download. This page wor
     for (let i = 1; i <= current.total; i++) {
       const cell = document.createElement('span');
       if (current.frames.has(i)) cell.className = 'got';
+      if (i === lastSeen) cell.classList.add('now');
+      cell.title = 'Frame ' + i;
       grid.appendChild(cell);
     }
+    showWhere();
+  }
+
+  // Move the outline to the frame just read, without redrawing the grid (frames repeat several times a second).
+  function markSeen(index) {
+    if (index === lastSeen) return;
+    const cells = $('grid').children;
+    if (lastSeen && cells[lastSeen - 1]) cells[lastSeen - 1].classList.remove('now');
+    lastSeen = index;
+    if (cells[index - 1]) cells[index - 1].classList.add('now');
+    showWhere();
+  }
+
+  function showWhere() {
+    if (!current || !lastSeen || current.frames.size === current.total) { $('where').textContent = ''; return; }
+    const next = framesUntilMissing(lastSeen, current.total, (i) => current.frames.has(i));
+    const missing = current.total - current.frames.size;
+    $('where').textContent = 'Now at frame ' + lastSeen + ' of ' + current.total + '. Next missing: frame ' + next.index +
+      (next.step === 1 ? ', the very next one' : ', ' + next.step + ' frames from now') +
+      (missing > 1 ? ' (' + missing + ' missing in all).' : '.');
   }
 
   function reset() {
     current = null;
+    lastSeen = 0;
     $('done').hidden = true;
     warn('');
     drawGrid();
@@ -144,10 +181,12 @@ used once. When every frame is in, a file is offered for download. This page wor
     const seen = current.frames.get(f.index);
     if (seen !== undefined) {
       if (seen !== f.raw) warn('Frame ' + f.index + ' was seen twice with different contents. Keeping the first.');
+      markSeen(f.index);
       return;
     }
     warn('');
     current.frames.set(f.index, f.raw);
+    lastSeen = f.index;
     drawGrid();
     say('Received ' + current.frames.size + ' of ' + current.total + ' frames.');
     if (current.frames.size === current.total) finish();

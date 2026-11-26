@@ -577,7 +577,8 @@ Being allowed is not the same as being practical:
 
 - **Time.** At the default 2 frames per second, 8,892 frames is about 74 minutes for one pass of the sender.
 - **A missed frame costs a whole pass.** The sender just loops, and the receiver has no way to ask for one frame
-  again. With thousands of frames, nearly every pass misses a few.
+  again. With thousands of frames, nearly every pass misses a few. `receiver.html` outlines the frame it read last
+  and says how many frames until the next missing one comes round, so you know how long to keep the camera on it.
 - **Split big files instead.** Each part is a separate, checked transfer:
 
 ```bash
