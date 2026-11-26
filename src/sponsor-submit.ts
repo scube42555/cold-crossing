@@ -112,6 +112,17 @@ try {
   shielded = { spends: 0, outputs: 0 };
 }
 
+/** What to do about an expired tx.hex. Nothing was submitted, so nothing was spent; a shielded spend also needs a new feed. */
+const expiredMessage = (expires: Date): string[] => [
+  `tx.hex expired at ${localStamp(expires)}. Nothing was submitted; the coins it would spend are unspent.`,
+  ...(shielded.spends > 0
+    ? [
+        'To try again: on this machine run `npm run hot:zswap-feed` (a new feed; the clock starts there), run',
+        'cold-shielded-transfer on the cold machine with it, and bring the new tx.hex back here before it expires.',
+      ]
+    : ['To try again: build and sign a new transfer on the cold machine (cold-transfer or the cold page), then run this.']),
+];
+
 // Show what this transaction does before the slow sync, so you can stop early if it is not what you expect.
 // If the contents cannot be read, say so and carry on: the cold machine already showed you what it signed.
 // details is kept in scope so the TTL can be checked again after the sync (tx.hex may expire during a long sync).
@@ -126,7 +137,7 @@ try {
   for (const line of describePlan(details, snapshot)) console.log(line);
   console.log('');
   if (details.expires && details.expires.getTime() <= Date.now()) {
-    console.error(`tx.hex expired at ${localStamp(details.expires)}; run cold-transfer again.`);
+    expiredMessage(details.expires).forEach((l) => console.error(l));
     process.exit(1);
   }
 } catch (err) {
@@ -164,7 +175,7 @@ if (!saved) beep(3); // alert that the long first sync is done
 
 // A long sync can outlast the TTL. Reject now rather than let adoptTransaction fail with a blank error.
 if (details?.expires && details.expires.getTime() <= Date.now()) {
-  console.error(`tx.hex expired at ${localStamp(details.expires)}; run cold-transfer again.`);
+  expiredMessage(details.expires).forEach((l) => console.error(l));
   await wallet.stop();
   beep(2);
   process.exit(1);
