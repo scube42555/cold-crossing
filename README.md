@@ -250,11 +250,13 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T38 *new* | `dust-watch <DUST address>` lists the generating NIGHT for a DUST address, and its estimate is close to the balance `sponsor-submit` prints for a sponsor that has not spent recently | Passed on Preprod (2026-11-13) for the listing: Blockfrost served the query, the answer was complete in 5 s, 3 coins listed, one reported as stopped after its NIGHT was spent, estimates consistent with the cap (5 DUST per NIGHT over 7 days). **Comparison with a real balance: not yet run** |
 | T39 *new* | `hot-zswap-feed <tx>...` writes a feed for the cold wallet's transactions, needs no seed, and its own rebuild reaches the tip root | Passed on Preprod (2026-11-25, two wNIGHT transactions of a test wallet, 4.7 KB feed) |
 | T40 *new* | `cold-shielded-transfer --address` prints the cold wallet's shielded address offline; funding it from another wallet works | **Not yet run** |
-| T41 *new* | `cold-shielded-transfer` offline: finds the coins from the feed, shows the plan, proves in WASM, the ledger's verifier accepts, writes `tx.hex` | Core passed offline (throwaway key, locally inserted coin: 1 spend + 2 outputs proved and checked in 214 s); prototype of the same steps passed on Preprod with a test wallet (block 3,578,333). The script itself: **not yet run** |
-| T42 *new* | `sponsor-submit` on a cold shielded `tx.hex`: shows the shielded part, adds DUST, submits, appends the identifier to `cold-shielded-txs.txt`; the next feed shows the change coin | **Not yet run** |
+| T41 *new* | `cold-shielded-transfer` offline: finds the coins from the feed, shows the plan, proves in WASM, the ledger's verifier accepts, writes `tx.hex` | Core passed offline (throwaway key, locally inserted coin: 1 spend + 2 outputs proved and checked in 214 s); prototype of the same steps passed on Preprod with a test wallet (block 3,578,333). **Passed on Preprod (26 Nov 2026)**: the cold machine rebuilt wallet A's wNIGHT coin from a real feed and proved 1 spend + 2 outputs in about 7 minutes; the `tx.hex` landed (T42) |
+| T42 *new* | `sponsor-submit` on a cold shielded `tx.hex`: shows the shielded part, adds DUST, submits, appends the identifier to `cold-shielded-txs.txt`; the next feed shows the change coin | **Passed on Preprod (26 Nov 2026)** apart from the last part: wNIGHT from wallet A (cold) to wallet B; showed "1 coin(s) spent, 2 output(s)", fee 0.743 DUST, submitted `00a42e10…43dcd3` and appended it to `cold-shielded-txs.txt`; 31 s in all from a saved sponsor state. The change coin in the next feed: **not yet checked**. Two earlier tries expired: one waiting for the sponsor's first sync, one on an unreachable proof server (both now caught early: T45, T46) |
 | T43 *new* | A feed older than 50 minutes is refused by `cold-shielded-transfer`; a tampered feed (pieces that do not reach the tip root) is refused | Passed offline (`npm run test:sdk`, `npm test`) |
-| T44 *new* | `hot:sponsor-sync` on a fresh sponsor: the DUST wallet starts at the ledger 9 fork (no ledger 8 DUST replay); progress lines and the 5-minute saves appear; Ctrl-C saves and the next run resumes | Fork search passed on Preprod (25 Nov 2026: dust event 1857961, version 2001100, 18 s; same as the wnight project's). A fresh sync with it: **not yet run** |
+| T44 *new* | `hot:sponsor-sync` on a fresh sponsor: the DUST wallet starts at the ledger 9 fork (no ledger 8 DUST replay); progress lines and the 5-minute saves appear; Ctrl-C saves and the next run resumes | Fork search passed on Preprod (25 Nov 2026: dust event 1857961, version 2001100, 18 s; same as the wnight project's). A first sync of a new sponsor completed on Preprod (26 Nov 2026) and saved its state; `sponsor-submit` then resumed from it and caught up in 4 s. Not checked from that run's log: the fork start, the 5-minute saves, Ctrl-C and resume |
 | T45 *new* | Early warnings: `hot-watch` / `hot-zswap-feed` with no `wallet-state-*.json` in the folder warn; `sponsor-submit` with no state and a `tx.hex` expiring within 3 h stops and keeps it | Notice logic passed (`npm test`); hot page check and sync button passed with stand-ins (`npm run test:server`). On Preprod: **not yet run** |
+| T46 *new* | `sponsor-submit` checks the proof server (`GET /version`) before the sync and before `SUBMIT`; an unreachable one stops it with `tx.hex` kept | Check logic passed (`npm test`); against the real servers the unset local default fails and the LAN proof server answers 9.0.2. On Preprod (26 Nov 2026) a real run printed "Proof server: reachable (version 9.0.2)" and went on. The stop on Preprod: **not yet run** |
+| T47 *new* | `receiver.html` outlines the frame it read last and says how many frames until the next missing one | Passed in headless Chromium with pasted frames (26 Nov 2026). With a camera: **not yet run** |
 
 **How the new tests are run**
 
@@ -497,11 +499,11 @@ parsing it.
   `hot-inspect` reading a real ledger 9 transaction. Not run: a real `hot-watch` or `sponsor-submit` under the server (long
   first sync, real output, the real prompt), the landing check against the chain, camera input, Firefox (only Chromium tried),
   and mainnet (T34–T37).
-- **Cold shielded spend (section 13): built 2026-11-25, not yet run end to end with these scripts.** What passed: a
-  prototype of the same steps on Preprod (a test wallet's coins rebuilt from a 2.6 KB feed, spend proved in WebAssembly from
-  local key files, sponsor added DUST, `SUCCESS` in block 3,578,333); `hot-zswap-feed` on Preprod (T39); the cold core
-  offline with a throwaway key (T41, T43). Not run: `cold-shielded-transfer` and `sponsor-submit` on a real cold wallet
-  (T40-T42), Tails, mainnet, coins received before the ledger 9 fork (refused by design), more than one input coin.
+- **Cold shielded spend (section 13): passed end to end on Preprod (2026-11-26).** Wallet A, as the cold wallet, sent
+  wNIGHT to wallet B: `hot-zswap-feed` (T39), `cold-shielded-transfer` on the cold machine (about 7 minutes of proving,
+  T41) and `sponsor-submit` (T42). Also passed: the cold core offline with a throwaway key (T41, T43). Not run: the change
+  coin in the next feed (T42), `--address` and funding (T40), Tails, mainnet, coins received before the ledger 9 fork
+  (refused by design), more than one input coin.
 - **`dust-watch` (section 12): the listing passed on Preprod (T38, 2026-11-13); the estimate is unconfirmed.** Blockfrost
   serves the `dustGenerations` subscription and ends the stream by itself. The estimate was consistent with the cap but has
   not been compared with the balance a wallet reports. Not run: an address with no registration, the other networks, mainnet.
