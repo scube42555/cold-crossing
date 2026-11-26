@@ -20,6 +20,7 @@ import * as ledgerV9 from '@midnightntwrk/wallet-sdk/ledger/v9';
 import * as zkir from '@midnightntwrk/zkir-v2';
 import { deriveAndWipe, readSeed } from './keys.js';
 import { elapsed, localStamp } from './timefmt.js';
+import { COLD_SYNC_REMINDER } from './syncnotice.js';
 import { assertFeedFor, feedDeadline, feedSummary, inspectFeed } from './zswapfeed.js';
 import {
   type KeyPins, acceptKeyFiles, balancesOf, buildShieldedTransfer, diskName, missingKeyFiles, planSpend, proveAndCheck,
@@ -56,6 +57,7 @@ if (addressOnly) {
   console.log(`Network:          ${NETWORK}`);
   console.log(`Shielded address: ${shieldedAddressOf(zswap)}`);
   console.log('Payments to this address (and this wallet\'s own spends) must be listed for hot-zswap-feed by transaction hash.');
+  console.log(COLD_SYNC_REMINDER);
   zswap.clear();
   process.exit(0);
 }

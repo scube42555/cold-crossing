@@ -21,7 +21,8 @@ even a viewing key; the cold machine rebuilds its coins, proves **locally** in W
 | `src/config.ts` | Network (`MIDNIGHT_NETWORK`), endpoints, wallet config, the chain-version probe. **Its first import must stay `./redact.js`.** |
 | `src/keys.ts` | Reads secrets from the environment, derives `WalletSeeds` and the keystore (`deriveAndWipe`). Roles: `COLD_*`, `SPONSOR_*`. |
 | `src/cold-export-public.ts`, `cold-transfer.ts`, `probe-cold-era.ts` | Cold machine. `cold-transfer` is offline: stub prover and submission, wallets start from seeds. |
-| `src/hot-watch.ts`, `sponsor-register.ts`, `sponsor-submit.ts`, `wallet.ts` | Hot machine. `wallet.ts` (sponsor) must never be imported by a cold script. |
+| `src/hot-watch.ts`, `sponsor-register.ts`, `sponsor-sync.ts`, `sponsor-submit.ts`, `wallet.ts`, `dustfork.ts` | Hot machine. `wallet.ts` (sponsor) and `dustfork.ts` (network) must never be imported by a cold script. `syncAndSave` (in `wallet.ts`) is the one sponsor sync: progress lines, periodic and Ctrl-C saves. A fresh DUST wallet starts at the ledger 9 fork found by `dustfork.ts`. |
+| `src/syncprogress.ts`, `src/syncnotice.ts` | The sync progress format and the "sync the sponsor early" notice. `syncprogress.ts` is pure (unit tested); `syncnotice.ts` reads file names and ages only, never a state file's contents, so cold scripts may import it. |
 | `src/snapshot.ts`, `txinfo.ts`, `crosscheck.ts`, `timefmt.ts`, `redact.ts`, `hex.ts`, `mqr.ts`, `qr-render.ts` | **Pure modules, no SDK imports.** Keep them that way: it is what makes them testable here. |
 | `src/qr-send.ts`, `qr-decode.ts`, `receiver/`, `tools/qr_scan.py` | QR transfer. `scripts/build-receiver.mjs` is build-time only. |
 | `src/mqr-core.ts` | The MQR1 frame pattern, splitting and joining: pure, shared by `mqr.ts` (Node) and `coldpage/mqr-web.ts`. |
@@ -35,7 +36,7 @@ even a viewing key; the cold machine rebuilds its coins, proves **locally** in W
 ## Commands
 
 `npm ci`, then `npm run build` (tsc, `dist/receiver.html`, `dist/cold-page.html` and `dist/hot-page.html`). **Scripts run from `dist/`, not `src/`:** rebuild after every edit. Typecheck with `npx tsc --noEmit`.
-Run scripts with `node dist/<name>.js` or the npm scripts (`cold:export-public`, `hot:watch`, `cold:transfer`, `hot:sponsor-register`, `hot:sponsor-submit`, `probe:cold-era`).
+Run scripts with `node dist/<name>.js` or the npm scripts (`cold:export-public`, `hot:watch`, `cold:transfer`, `hot:sponsor-register`, `hot:sponsor-sync`, `hot:sponsor-submit`, `probe:cold-era`).
 **npm swallows flags:** write `npm run <script> -- --dry-run`. Env: `MIDNIGHT_NETWORK` (default `preprod`), `BLOCKFROST_PROJECT_ID`, `PROOF_SERVER_URL`,
 `COLD_MNEMONIC`/`COLD_PASSPHRASE`, `SPONSOR_MNEMONIC`/`SPONSOR_PASSPHRASE`, plus `ASSUME_LEDGER9`, `TTL_MINUTES`, `SNAPSHOT_FILE`, `COLD_PUBLIC_FILE`,
 `ALLOW_MAINNET` and others listed in the README.

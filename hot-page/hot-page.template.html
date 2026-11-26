@@ -107,6 +107,12 @@ ul.plain { margin: 6px 0; padding-left: 20px; }
       <dt>Folder</dt><dd id="dir"></dd>
     </dl>
     <ul id="envChecks" class="checks"></ul>
+    <p>Step 4 needs the sponsor wallet synced. A first sync takes hours, so start it here at the beginning, not at step 4:
+      it runs <span class="mono">sponsor-sync</span>, which only syncs and saves (Stop keeps what it has so far).</p>
+    <div class="actions"><button id="syncBtn" type="button" disabled>Sync the sponsor now</button>
+      <button id="syncCancel" class="secondary" type="button" hidden>Stop</button></div>
+    <pre id="syncLog" class="log" hidden></pre>
+    <div id="syncErr" class="banner err" hidden></div>
   </section>
 
   <section id="s1">

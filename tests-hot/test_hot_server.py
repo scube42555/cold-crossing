@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(HERE), "tools"))
 import hot_server  # noqa: E402
 
 FAKE_DIST = os.path.join(HERE, "fake-dist")
+SPONSOR_ADDRESS = "mn_addr_preprod1rwkswmczy5przerxkwn5anxtgjge40a5m6cputamv9styeplzx3q222lwj"
 MARKER = "marker-not-a-real-phrase-7f3a"
 ADDRESS = "mn_addr_preprod1" + "q" * 52
 PUBLIC = {"sdk": 2, "network": "preprod", "address": ADDRESS,
@@ -169,6 +170,19 @@ class ServerTest(unittest.TestCase):
         self.assertNotIn(MARKER.encode(), raw)
         self.assertTrue(state["built"])
         self.assertEqual(state["files"], {"cold-public.json": None, "cold-unshielded.snapshot.json": None, "tx.hex": None})
+        self.assertEqual(state["sponsorStates"], [])
+
+    def test_saved_sponsor_states_are_listed_by_name_and_age_only(self):
+        name = "wallet-state-%s.json" % SPONSOR_ADDRESS
+        with open(os.path.join(self.dir, name), "w") as f:
+            f.write(MARKER)
+        with open(os.path.join(self.dir, "wallet-state-x.json"), "w") as f:
+            f.write("{}")
+        res, raw = self.request("POST", "/api/state", {})
+        states = json.loads(raw)["sponsorStates"]
+        self.assertEqual([s["address"] for s in states], [SPONSOR_ADDRESS])
+        self.assertIsInstance(states[0]["mtime"], int)
+        self.assertNotIn(MARKER.encode(), raw)  # the file is never opened
 
     def test_put_checks_and_writes_private_files(self):
         self.api("put", {"name": "cold-public.json", "text": json.dumps(dict(PUBLIC, network="preview"))}, expect=400)
@@ -202,6 +216,17 @@ class ServerTest(unittest.TestCase):
         self.assertIn('ARGS ["cold-public.json","cold-unshielded.snapshot.json"]', job["log"])
         self.assertIn("Network: preprod", job["log"])
         self.assertIn(ADDRESS, job["log"])
+
+    def test_sync_runs_sponsor_sync_with_no_arguments_and_needs_the_secret(self):
+        self.api("run", {"job": "sync", "argv": ["--evil"], "env": {"X": "1"}})
+        job = self.wait_job(lambda j: not j["running"], "sponsor-sync to end")
+        self.assertEqual(job["rc"], 0)
+        self.assertEqual(job["kind"], "sync")
+        self.assertIn("ARGS []", job["log"])
+        self.assertIn("Network:  preprod", job["log"])
+        self.assertEqual([s["address"] for s in self.api("state", {})["sponsorStates"]], [SPONSOR_ADDRESS])
+        os.environ.pop("SPONSOR_MNEMONIC", None)
+        self.api("run", {"job": "sync"}, expect=400)
 
     def test_only_one_script_at_a_time_and_no_file_changes_meanwhile(self):
         self.put_files()

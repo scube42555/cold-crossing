@@ -6,7 +6,7 @@ import * as Rx from 'rxjs';
 import { NIGHT } from './txinfo.js';
 import { beep } from './beep.js';
 import { deriveAndWipe, readSeed } from './keys.js';
-import { buildWallet, describePhase, loadWalletState, onLedger9, saveWalletState, submitWithRetry, walletStateFile } from './wallet.js';
+import { buildWallet, describePhase, loadWalletState, onLedger9, saveWalletState, submitWithRetry, syncAndSave, walletStateFile } from './wallet.js';
 
 checkColdPublicNetwork(NETWORK);
 console.log(`Network: ${NETWORK}`);
@@ -17,12 +17,11 @@ const stateFile = walletStateFile(keys);
 
 const saved = await loadWalletState(stateFile);
 const wallet = await buildWallet(keys, saved);
-let state = await wallet.waitForSyncedState();
 console.log(`Sponsor address: ${unshieldedKeystore.getBech32Address()}`);
+// Progress is printed and saved as it goes; the synced state is kept even if a later step fails.
+let state = await syncAndSave(wallet, stateFile);
 const nightStar = state.unshielded.balances[NIGHT] ?? 0n;
 console.log(`NIGHT (STAR):    ${nightStar}`);
-await saveWalletState(wallet, stateFile); // the sync can take over an hour: keep it even if a later step fails
-console.log(`Saved the synced wallet state to ${stateFile}.`);
 if (!saved) beep(3); // alert that the long first sync is done
 console.log(`Protocol phase:  ${describePhase(state.protocol)}`);
 if (!onLedger9(state.protocol)) {

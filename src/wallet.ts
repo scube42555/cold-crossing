@@ -8,10 +8,15 @@ import {
   DustWallet,
   UnshieldedWallet,
   PublicKey,
+  ProtocolVersion,
 } from '@midnightntwrk/wallet-sdk';
-import { assumeLedger9, hotEndpoints, walletConfig } from './config.js';
+import { Option } from 'effect';
+import { NETWORK, assumeLedger9, hotEndpoints, walletConfig } from './config.js';
 import { LEDGER9_PROTOCOL_VERSION } from './snapshot.js';
 import { type WalletKeys } from './keys.js';
+import { findDustForkStart } from './dustfork.js';
+import { progressLine, saveIntervalMs, syncLogIntervalMs } from './syncprogress.js';
+import { elapsed } from './timefmt.js';
 
 export type SavedWalletState = { shielded: string; unshielded: string; dust: string };
 
@@ -51,21 +56,102 @@ export const onLedger9 = (protocol: { _tag: string; version?: bigint }): boolean
  * Verified (11 Nov 2026): shielded and DUST wallets crossed to ledger 9 on their own (Protocol phase: Settled 2000000).
  * Verified (11 Nov 2026): restore() accepts a snapshot written by this SDK version.
  * The lifecycle store (transactionLifecycleService.serializeState) is not saved: a fresh one per run is enough here.
+ *
+ * A FRESH DUST wallet starts at the ledger 9 fork instead (src/dustfork.ts, from the wnight project): the fork emptied all
+ * DUST state and re-emitted live DUST as ledger 9 events, so the ledger 8 DUST history, the slowest part of a first sync,
+ * holds nothing it needs. A restored wallet resumes from its saved cursor and is not affected. DUST_FORK_SEARCH=off: as before.
  */
 export const buildWallet = async (keys: WalletKeys, saved?: SavedWalletState): Promise<WalletFacade> => {
   const { seeds, unshieldedKeystore } = keys;
+  const endpoints = hotEndpoints();
+  const forkStart = saved || NETWORK === 'undeployed' ? undefined : await findDustForkStart(NETWORK, endpoints.indexerHttpUrl, endpoints.indexerWsUrl);
+  const dustStart = forkStart
+    ? { dustTimelineStartProbe: async () => Option.some({ cursor: forkStart.cursor, version: ProtocolVersion.ProtocolVersion(forkStart.version) }) }
+    : {};
 
   const wallet = await WalletFacade.init({
-    configuration: walletConfig(hotEndpoints(), { assumeLedger9: false }),
+    configuration: walletConfig(endpoints, { assumeLedger9: false }),
     shielded: (cfg) => (saved ? ShieldedWallet(cfg).restore(saved.shielded) : ShieldedWallet(cfg).startWithSeed(seeds.shielded)),
     unshielded: (cfg) =>
       saved
         ? UnshieldedWallet(cfg).restore(saved.unshielded)
         : UnshieldedWallet({ ...cfg, chainVersionProbe: assumeLedger9 }).startWithPublicKey(PublicKey.fromKeyStore(unshieldedKeystore)),
-    dust: (cfg) => (saved ? DustWallet(cfg).restore(saved.dust) : DustWallet(cfg).startWithSeed(seeds.dust)),
+    dust: (cfg) => (saved ? DustWallet(cfg).restore(saved.dust) : DustWallet({ ...cfg, ...dustStart }).startWithSeed(seeds.dust)),
   });
   await wallet.start(seeds); // 4.x: wallet.start(shieldedSecretKeys, dustSecretKey)
   return wallet;
+};
+
+type SyncedState = Awaited<ReturnType<WalletFacade['waitForSyncedState']>>;
+
+/**
+ * Wait for a full sync, printing progress like the wnight project: a line whenever a part (shielded, unshielded, DUST)
+ * finishes, and otherwise every MIDNIGHT_SYNC_LOG_INTERVAL_MS (default 15 s). What is synced so far is saved to `file`
+ * every MIDNIGHT_WALLET_SAVE_INTERVAL_MS (default 5 minutes), on Ctrl-C and if the sync fails, so a long first sync that is
+ * interrupted resumes from the last save instead of from the start. The synced state is saved at the end.
+ */
+export const syncAndSave = async (wallet: WalletFacade, file: string): Promise<SyncedState> => {
+  const started = Date.now();
+  const interval = syncLogIntervalMs();
+  let updates = 0;
+  let lastKey = '';
+  let lastAt = 0;
+  let lastLine = 'Sync: waiting for the first update from the indexer';
+  const print = (line: string) => {
+    console.log(line);
+    lastAt = Date.now();
+  };
+  const sub = wallet.state().subscribe((s) => {
+    updates++;
+    const { line, key } = progressLine(
+      { shielded: s.shielded.progress, unshielded: s.unshielded.progress, dust: s.dust.progress },
+      updates,
+      Math.round((Date.now() - started) / 1000),
+    );
+    lastLine = line;
+    if (key !== lastKey || Date.now() - lastAt >= interval) {
+      lastKey = key;
+      print(line);
+    }
+  });
+  // A quiet indexer sends nothing for minutes: still show that the run is alive.
+  const heartbeat = setInterval(() => {
+    if (Date.now() - lastAt >= interval) print(`${lastLine.replace(/^Sync \(\d+ s\)/, `Sync (${Math.round((Date.now() - started) / 1000)} s)`)}, no new update`);
+  }, interval);
+  let saving: Promise<void> | undefined;
+  const saveProgress = (): Promise<void> =>
+    (saving ??= saveWalletState(wallet, file)
+      .then(() => console.log(`Saved sync progress to ${file}.`))
+      .catch((err: unknown) => console.warn(`Could not save sync progress: ${err instanceof Error ? err.message : String(err)}`))
+      .finally(() => {
+        saving = undefined;
+      }));
+  const saver = setInterval(() => void saveProgress(), saveIntervalMs());
+  // Ctrl-C in a terminal, SIGTERM from the hot page's Stop: save first, then exit.
+  const onSignal = (signal: NodeJS.Signals) => {
+    console.warn('Interrupted: saving sync progress before exiting (Ctrl-C again to quit without saving)...');
+    process.once('SIGINT', () => process.exit(130));
+    void saveProgress().finally(() => process.exit(signal === 'SIGTERM' ? 143 : 130));
+  };
+  process.once('SIGINT', onSignal);
+  process.once('SIGTERM', onSignal);
+  let synced: SyncedState;
+  try {
+    synced = await wallet.waitForSyncedState();
+  } catch (err) {
+    await saveProgress();
+    throw err;
+  } finally {
+    sub.unsubscribe();
+    clearInterval(heartbeat);
+    clearInterval(saver);
+    process.off('SIGINT', onSignal);
+    process.off('SIGTERM', onSignal);
+  }
+  await saving;
+  await saveWalletState(wallet, file);
+  console.log(`Synced in ${elapsed(Date.now() - started)} (${updates} updates); saved the synced wallet state to ${file}.`);
+  return synced;
 };
 
 /** Submit a finalized transaction, trying again if the connection to the node drops. */

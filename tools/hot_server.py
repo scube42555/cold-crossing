@@ -8,8 +8,9 @@ BLOCKFROST_PROJECT_ID, SPONSOR_MNEMONIC and so on, set with `read -rs`). Open th
 one-time token after the #. The page receives cold-public.json and tx.hex from the cold machine (camera, dropped
 file or paste), shows the snapshot as QR codes, and submits after you type SUBMIT.
 
-All the Midnight work is done by the existing scripts in dist/ (hot-watch, sponsor-submit, hot-inspect), started
-with fixed arguments in --dir. The scripts inherit this process's environment and read the secrets themselves, as
+All the Midnight work is done by the existing scripts in dist/ (hot-watch, sponsor-sync, sponsor-submit,
+hot-inspect), started with fixed arguments in --dir. sponsor-sync can be started early, so that step 4 only catches
+up. The scripts inherit this process's environment and read the secrets themselves, as
 they do from a terminal. This server only checks WHETHER the sponsor secret and the Blockfrost token are set; it
 never copies, logs or sends them, and no request can change a script's arguments or environment.
 
@@ -43,6 +44,7 @@ MAX_SNAPSHOT = 4 * 1024 * 1024  # the same limit the QR tools use
 MAX_LOG = 2_000_000
 PROMPT = "Type SUBMIT to continue:"  # the end of sponsor-submit's question
 
+STATE_RE = re.compile(r"wallet-state-(mn_addr_[a-z]+1[02-9ac-hj-np-z]{20,120})\.json")  # a sponsor's saved sync state
 ADDRESS_RE = re.compile(r"mn_addr(_[a-z]+)?1[02-9ac-hj-np-z]{20,120}")
 HEX_RE = re.compile(r"(?:[0-9a-f]{2})+")
 KEY_HEX_RE = re.compile(r"[0-9a-f]{64}")
@@ -194,6 +196,15 @@ class Hot:
         st = os.stat(p)
         return {"size": st.st_size, "mtime": int(st.st_mtime)}
 
+    def sponsor_states(self):
+        """The saved wallet states in the folder: address (public, from the file name) and age only. Never opened."""
+        out = []
+        for n in sorted(os.listdir(self.dir)):
+            m = STATE_RE.fullmatch(n)
+            if m and os.path.isfile(self.path(n)):
+                out.append({"address": m.group(1), "mtime": int(os.stat(self.path(n)).st_mtime)})
+        return out
+
     def sha_of(self, name):
         with open(self.path(name), "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()
@@ -213,7 +224,8 @@ class Hot:
                 "proofServerSet": set_("PROOF_SERVER_URL"),
                 "allowMainnet": os.environ.get("ALLOW_MAINNET") == "1",
             },
-            "built": all(os.path.isfile(self.script(s)) for s in ("hot-watch", "sponsor-submit", "hot-inspect")),
+            "sponsorStates": self.sponsor_states(),
+            "built": all(os.path.isfile(self.script(s)) for s in ("hot-watch", "sponsor-submit", "hot-inspect", "sponsor-sync")),
             "job": self.job.view(1 << 60) if self.job else None,  # status only; the log comes from /api/job
         }
 
@@ -282,6 +294,12 @@ class Hot:
                 dry = body.get("dryRun") is True
                 argv = [self.node, self.script("sponsor-submit"), TX] + (["--dry-run"] if dry else [])
                 extra = {"dryRun": dry, "txSha": self.sha_of(TX)}
+            elif kind == "sync":
+                # Only syncs the sponsor and saves its state, so that step 4 later only catches up. Reads the sponsor
+                # secret itself, from the environment it inherits, like sponsor-submit.
+                if not any(os.environ.get(n, "") != "" for n in ("SPONSOR_MNEMONIC", "SPONSOR_SEED")):
+                    raise Refuse("SPONSOR_MNEMONIC is not set in the server's terminal: stop the server, set it with read -rs, export it, start again.")
+                argv, extra = [self.node, self.script("sponsor-sync")], {}
             else:
                 raise Refuse("Unknown script.")
             if not os.path.isfile(argv[1]):

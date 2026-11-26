@@ -13,6 +13,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import * as ledgerV9 from '@midnightntwrk/wallet-sdk/ledger/v9';
 import { fromHex } from './hex.js';
+import { printSponsorNotice } from './syncnotice.js';
 import {
   FEED_KIND, FEED_VERSION, LEDGER9, type Feed, type FeedSegment, type FeedTip, type TxSegment,
   feedSummary, inspectFeed, normalizeTxHash, parseTxList, planGaps, rootMatches,
@@ -29,6 +30,7 @@ const flag = (name: string): string | undefined => {
 };
 const listFile = flag('--list') ?? process.env.COLD_TX_LIST ?? 'cold-shielded-txs.txt';
 const outFile = flag('--out') ?? process.env.FEED_FILE ?? 'cold-zswap.feed.json';
+printSponsorNotice(); // early: the feed is valid for an hour, and sponsor-submit needs the sponsor synced
 
 const ids: string[] = [];
 for (const a of argv) {

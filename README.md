@@ -141,6 +141,14 @@ The sponsor wallet uses `SPONSOR_PASSPHRASE`. Four things to know:
 
 The scripts delete the passphrase variable from the process environment after reading it, like the other secrets.
 
+**Sync the sponsor first.** The last step of every transfer, `sponsor-submit`, needs the sponsor wallet synced, and a
+first sync takes hours. So start it at the beginning, on the hot machine, in its own terminal (and in the folder the hot
+scripts run in): `npm run hot:sponsor-sync`. It only syncs and saves `wallet-state-<sponsor address>.json`; the last step
+then only catches up. The first step of each flow reminds you: `cold-export-public`, `cold-shielded-transfer --address` and
+the cold page say so, and `hot-watch`, `hot-zswap-feed` and the hot page look at the saved states in their folder and warn
+when there is none (or only an old one). With no saved state, `sponsor-submit` stops before syncing if `tx.hex` expires
+within 3 hours, and keeps `tx.hex`; `--sync-anyway` overrides that. See section 8 for the sync's progress lines.
+
 1. **Cold:** `npm run cold:export-public`. Copy `cold-public.json` to the hot machine (public data, no secrets). USB or QR both work; for QR see section 7 "Cold to hot: the public key".
 2. **Fund the cold address** from the faucet for your network (section 2). On preprod that is
    https://midnight-tmnight-preprod.nethermind.dev/ (5,000 tNIGHT per request, rate limited).
@@ -243,6 +251,8 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T41 *new* | `cold-shielded-transfer` offline: finds the coins from the feed, shows the plan, proves in WASM, the ledger's verifier accepts, writes `tx.hex` | Core passed offline (throwaway key, locally inserted coin: 1 spend + 2 outputs proved and checked in 214 s); prototype of the same steps passed on Preprod with a test wallet (block 3,578,333). The script itself: **not yet run** |
 | T42 *new* | `sponsor-submit` on a cold shielded `tx.hex`: shows the shielded part, adds DUST, submits, appends the identifier to `cold-shielded-txs.txt`; the next feed shows the change coin | **Not yet run** |
 | T43 *new* | A feed older than 50 minutes is refused by `cold-shielded-transfer`; a tampered feed (pieces that do not reach the tip root) is refused | Passed offline (`npm run test:sdk`, `npm test`) |
+| T44 *new* | `hot:sponsor-sync` on a fresh sponsor: the DUST wallet starts at the ledger 9 fork (no ledger 8 DUST replay); progress lines and the 5-minute saves appear; Ctrl-C saves and the next run resumes | Fork search passed on Preprod (25 Nov 2026: dust event 1857961, version 2001100, 18 s; same as the wnight project's). A fresh sync with it: **not yet run** |
+| T45 *new* | Early warnings: `hot-watch` / `hot-zswap-feed` with no `wallet-state-*.json` in the folder warn; `sponsor-submit` with no state and a `tx.hex` expiring within 3 h stops and keeps it | Notice logic passed (`npm test`); hot page check and sync button passed with stand-ins (`npm run test:server`). On Preprod: **not yet run** |
 
 **How the new tests are run**
 
@@ -666,7 +676,7 @@ and noise, and the older detector, which the script uses only when Aruco is miss
 loop against a simulated webcam, with the output decoded by `qr-decode` to the identical file. **Verified by you:** it works
 with a real camera on a TailsOS cold machine (a 2011 CPU), with wheels downloaded for that machine's Python version.
 
-## 8. Audible alerts and progress (`sponsor-register`, `sponsor-submit`)
+## 8. Audible alerts and progress (`sponsor-sync`, `sponsor-register`, `sponsor-submit`)
 
 Both scripts make sounds during long operations so you can step away and return when needed.
 
@@ -678,12 +688,29 @@ Both scripts make sounds during long operations so you can step away and return 
 - **Prompt ready:** one beep when the `SUBMIT` prompt appears, then another every 20 seconds until you answer.
 - **Finished:** two beeps when the submission (or dry run) completes.
 
-Both scripts print progress while syncing: whether the wallet is resuming from a saved state or syncing from scratch, a "Still syncing..." line every 30 seconds, and "Synced in N s" when done.
+All three sync the sponsor the same way (`syncAndSave` in `src/wallet.ts`, after the wnight project's sync):
+
+- They say first whether they resume from a saved state (and when it was saved) or start from scratch.
+- A progress line, printed whenever a part finishes and otherwise every `MIDNIGHT_SYNC_LOG_INTERVAL_MS` (15 s):
+  `Sync (840 s): shielded done, unshielded 99.9%, dust 41.7% (update 5120)`. A quiet indexer sends nothing for minutes;
+  the line is then repeated with "no new update". The percentage can dip briefly, as new blocks raise the target.
+- What is synced so far is saved every `MIDNIGHT_WALLET_SAVE_INTERVAL_MS` (5 minutes), on Ctrl-C (and on the hot page's Stop),
+  and if the sync fails. An interrupted first sync resumes from the last save. Ctrl-C twice quits without saving.
+- **A fresh sponsor's DUST wallet starts at the ledger 9 fork.** The fork emptied the DUST state and re-issued live DUST as
+  ledger 9 events, so the ledger 8 DUST history (most of the old ~9.5 h first sync) holds nothing the sponsor needs.
+  `src/dustfork.ts` finds that point on the DUST event timeline once (about 20 s on Preprod through Blockfrost) and caches
+  it in `dust-fork-<network>-<indexer host>.json` in the folder (public chain data, checked against the chain on each use).
+  A restored wallet resumes from its own cursor and is not affected. The shielded wallet still syncs from the start.
+- "Synced in N s (U updates)" when done, and the state is saved.
 
 | Setting | Effect |
 |---|---|
 | `NO_BEEP=1` | Turns all beeps off |
 | `BEEP_CMD="..."` | Also runs this command at each beep, for when the terminal bell is muted |
+| `MIDNIGHT_SYNC_LOG_INTERVAL_MS=60000` | Print a sync progress line at most this often (default 15000; a part finishing always prints) |
+| `MIDNIGHT_WALLET_SAVE_INTERVAL_MS=600000` | Save sync progress this often (default 300000) |
+| `DUST_FORK_SEARCH=off` | A fresh sponsor replays the ledger 8 DUST history, as before (slow) |
+| `DUST_FORK_PROBE_TIMEOUT_MS` | How long one indexer request of the fork search may take (default 120000, 3 tries each) |
 | `LOG_VERBOSE=1` | Show the full SDK log output instead of collapsing `Wallet.Sync` / `API-WS` lines. Applies to all scripts, including `cold-transfer`. |
 
 ```bash
@@ -698,8 +725,8 @@ Terminal, in the profile preferences). The beep is written only when output goes
 
 **Why the script is slow, and what to look at:**
 
-- **No saved state.** The first run syncs the whole chain. Running `sponsor-register` to completion
-  saves the state; `sponsor-submit` then resumes from it. If the startup line says "No saved state"
+- **No saved state.** The first run syncs the whole chain (the DUST part from the ledger 9 fork only). Running
+  `sponsor-sync` or `sponsor-register` to completion saves the state; `sponsor-submit` then resumes from it. If the startup line says "No saved state"
   after a completed register run, the state file name differs between the two scripts; report it.
 - **A stale saved state.** Only the gap since the last save needs syncing, so this should be quicker.
 - **Blockfrost sync lag.** The docs say that on an idle subscription the indexer reports unshielded sync
@@ -845,6 +872,9 @@ server with Ctrl+C; a script that is still running is stopped with it. `--dir` i
 
 **The steps on the page**
 
+0. **This server:** lists the saved sponsor states in the folder (address and age, from the file names) and warns when
+   there is none. *Sync the sponsor now* runs `sponsor-sync` (no arguments), so step 4 later only catches up; start it
+   first. *Stop* saves what it has so far.
 1. **Public key file:** receive `cold-public.json` from the cold page (QR kind `pubkey`, a file, or paste). Once per wallet.
 2. **Snapshot:** *Take a snapshot* runs `hot-watch` and shows its output. Then *Show as QR for the cold machine* (kind
    `snapshot`) or download it. The SHA-256 shown is the one the cold page shows when it reads the snapshot.
@@ -950,6 +980,8 @@ folder to the cold machine and check it there with `sha256sum -c SHA256SUMS`. Th
 only.
 
 ```bash
+# hot, first (its own terminal): sync the sponsor now, so the last step does not have to; a tx.hex expires ~50 min after its feed
+npm run hot:sponsor-sync
 # cold, once: the address to fund (shielded; give it to whoever pays you)
 node dist/cold-shielded-transfer.js --address
 # hot: after each payment in, add its transaction hash to cold-shielded-txs.txt; then, right before a spend:

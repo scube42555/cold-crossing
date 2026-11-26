@@ -7,6 +7,7 @@ import { NETWORK } from './config.js';
 import { writeFileSync } from 'node:fs';
 import { PublicKey } from '@midnightntwrk/wallet-sdk';
 import { deriveAndWipe, readSeed } from './keys.js';
+import { COLD_SYNC_REMINDER } from './syncnotice.js';
 
 console.log(`Network: ${NETWORK}`);
 const keys = deriveAndWipe(readSeed('COLD'));
@@ -19,4 +20,5 @@ const out = { sdk: 2, network: NETWORK, address, publicKey: PublicKey.fromKeySto
 writeFileSync('cold-public.json', JSON.stringify(out, null, 2));
 console.log(`Wrote cold-public.json for ${address}`);
 console.log('Compare this address with the one you already know for this wallet BEFORE funding it.');
+console.log(COLD_SYNC_REMINDER);
 process.exit(0);

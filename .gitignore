@@ -18,6 +18,9 @@ received-*
 *.feed.json
 cold-shielded-txs.txt
 
+# Public chain data cached by src/dustfork.ts (where ledger 9 starts on the DUST timeline): rebuilt on demand
+dust-fork-*.json
+
 # Cold bundle material: built per machine, large, and not source
 cold-bundle*
 *.tar.gz

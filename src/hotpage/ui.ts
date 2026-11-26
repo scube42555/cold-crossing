@@ -53,7 +53,7 @@ const token = location.hash.slice(1);
 
 type FileInfo = { size: number; mtime: number } | null;
 type JobView = {
-  kind: 'watch' | 'submit';
+  kind: 'watch' | 'submit' | 'sync';
   running: boolean;
   rc: number | null;
   prompt: boolean;
@@ -68,6 +68,8 @@ type State = {
   dir: string;
   files: Record<string, FileInfo>;
   env: { sponsorSecret: boolean; blockfrost: boolean; needsBlockfrost: boolean; proofServerSet: boolean; allowMainnet: boolean };
+  /** Saved wallet states in the server's folder: address (from the file name) and when it was last saved. */
+  sponsorStates: { address: string; mtime: number }[];
   built: boolean;
   job: JobView | null;
 };
@@ -364,6 +366,25 @@ const check = (list: HTMLElement, cls: 'ok' | 'error' | 'warn' | 'info', text: s
   list.append(el('li', text, cls));
 };
 
+const DAY_S = 24 * 3600;
+const ageText = (seconds: number): string =>
+  seconds < 3600 ? `${Math.max(1, Math.round(seconds / 60))} min` : seconds < 2 * DAY_S ? `${(seconds / 3600).toFixed(1)} h` : `${(seconds / DAY_S).toFixed(1)} days`;
+
+/** Sync ahead: say early whether step 4 will find a synced sponsor, so the slow sync can start now. */
+const sponsorStateChecks = (list: HTMLElement, s: State): void => {
+  const states = [...s.sponsorStates].sort((a, b) => b.mtime - a.mtime);
+  if (states.length === 0) {
+    check(list, 'warn', 'No saved sponsor wallet state in this folder: step 4 would sync the sponsor from scratch, which takes hours (and a shielded transfer expires about 50 minutes after its feed). Press "Sync the sponsor now" first.');
+    return;
+  }
+  const now = Date.now() / 1000;
+  for (const st of states) {
+    const a = st.address;
+    check(list, now - st.mtime > DAY_S ? 'info' : 'ok', `Saved wallet state for ${a.slice(0, 18)}...${a.slice(-8)}, last saved ${ageText(now - st.mtime)} ago.${now - st.mtime > DAY_S ? ' Step 4 catches up first; to have that done early, press "Sync the sponsor now".' : ''}`);
+  }
+  check(list, 'info', 'Step 4 resumes from the saved state whose address is the sponsor\'s (SPONSOR_MNEMONIC). Another address means a sync from scratch.');
+};
+
 const render = (): void => {
   if (!state) return;
   const s = state;
@@ -379,6 +400,7 @@ const render = (): void => {
   }
   if (s.env.sponsorSecret) check(env, 'ok', 'The sponsor wallet\'s secret is set in the server\'s terminal (its value is not read here). Needed for step 4 only.');
   else check(env, 'warn', 'SPONSOR_MNEMONIC is not set. Snapshots work without it; step 4 needs it: stop the server, set it with read -rs, export it, start again.');
+  sponsorStateChecks(env, s);
   check(env, 'info', s.env.proofServerSet ? 'PROOF_SERVER_URL is set: sponsor-submit will use that proof server.' : 'Proof server: the default, http://127.0.0.1:6300. It must be running for step 4.');
   if (s.network === 'mainnet') check(env, 'warn', 'MAINNET: real funds. This page has not been run on mainnet.');
 
@@ -407,6 +429,7 @@ const render = (): void => {
   // Step 2
   unlock('s2', pubOk);
   button('watchBtn').disabled = !pubOk || busy || !s.built;
+  button('syncBtn').disabled = busy || !s.built || !s.env.sponsorSecret;
   const snap = i?.snapshot ?? null;
   const snapList = $('snapChecks');
   snapList.replaceChildren();
@@ -527,6 +550,21 @@ const follow = async (logEl: HTMLElement, onView?: (v: JobView) => void): Promis
   }
 };
 
+const runSync = async (): Promise<void> => {
+  setErr('syncErr', '');
+  show($('syncCancel'), true);
+  try {
+    await api('run', { job: 'sync' });
+    const end = await follow($('syncLog'));
+    if (end.rc !== 0) setErr('syncErr', `sponsor-sync stopped (exit code ${end.rc ?? 'none'}). Its output above says why; what it synced so far is saved.`);
+  } catch (e) {
+    setErr('syncErr', messageOf(e));
+  } finally {
+    show($('syncCancel'), false);
+    await refresh().catch(() => undefined);
+  }
+};
+
 const runWatch = async (): Promise<boolean> => {
   setErr('watchErr', '');
   stopQr($('snapQrBox'));
@@ -626,6 +664,8 @@ window.addEventListener('drop', (e) => {
 });
 
 button('watchBtn').addEventListener('click', () => void runWatch());
+button('syncBtn').addEventListener('click', () => void runSync());
+button('syncCancel').addEventListener('click', () => void api('cancel').catch((e) => setErr('syncErr', messageOf(e))));
 button('watchCancel').addEventListener('click', () => void api('cancel').catch((e) => setErr('watchErr', messageOf(e))));
 
 button('snapQr').addEventListener('click', () => {
@@ -705,7 +745,12 @@ void (async () => {
     await refresh();
     const job = state?.job;
     if (job?.running) {
-      if (job.kind === 'watch') {
+      if (job.kind === 'sync') {
+        show($('syncCancel'), true);
+        await follow($('syncLog'));
+        show($('syncCancel'), false);
+        await refresh();
+      } else if (job.kind === 'watch') {
         show($('watchCancel'), true);
         await follow($('watchLog'));
         show($('watchCancel'), false);

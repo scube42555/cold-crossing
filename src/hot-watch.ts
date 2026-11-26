@@ -5,8 +5,10 @@ import { readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { DefaultForkSchedule, UnshieldedAddress, UnshieldedWallet, type PublicKey } from '@midnightntwrk/wallet-sdk';
 import { NIGHT } from './txinfo.js';
 import { inspectSnapshot } from './snapshot.js';
+import { printSponsorNotice } from './syncnotice.js';
 
 console.log(`Network: ${NETWORK}`);
+printSponsorNotice(); // early: the flow's last step needs the sponsor synced
 // Usage: node dist/hot-watch.js [--no-probe] [cold-public.json] [snapshot out]
 // The watcher starts on the ledger 9 variant (assumeLedger9 in config.ts), so the snapshot is written by it: measured, a watcher
 // without the probe wrote "written by v1" at protocol version 1000300, and an offline cold machine restoring that would build ledger 8.

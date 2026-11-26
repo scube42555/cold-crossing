@@ -1,8 +1,10 @@
 // Run on the HOT machine. Takes the finalized transaction from the cold machine, adds DUST to pay the fee
 // from the sponsor wallet, and submits it.
 //
-// Usage: node dist/sponsor-submit.js [tx.hex] [--dry-run]
+// Usage: node dist/sponsor-submit.js [tx.hex] [--dry-run] [--sync-anyway]
 // --dry-run balances and finalizes (proving locally) but does not submit.
+// With no saved sponsor state it stops before syncing if tx.hex expires within 3 hours (run hot:sponsor-sync first);
+// --sync-anyway syncs from scratch regardless.
 //
 // Wallet SDK 2. Before asking you to confirm it shows who sends and receives, the From wallet's balance and coins (from
 // cold-unshielded.snapshot.json, or SNAPSHOT_FILE, if present), the sponsor's addresses and DUST balance, and an estimate of the DUST
@@ -13,7 +15,7 @@
 // balanceFinalizedTransaction, signRecipe, finalizeRecipe and submitTransaction exercised end to end.
 import { ADDITIONAL_FEE_OVERHEAD, NETWORK, NETWORK_ID } from './config.js';
 import { checkColdPublicNetwork } from './crosscheck.js';
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
 import * as ledgerV9 from '@midnightntwrk/wallet-sdk/ledger/v9';
 import { DustAddress, UnshieldedAddress } from '@midnightntwrk/wallet-sdk';
@@ -23,7 +25,7 @@ import { beep } from './beep.js';
 import { describePlan, declaredDustFee, formatDust, readTransaction, type TxDetails } from './txinfo.js';
 import { inspectSnapshot, type SnapshotInfo } from './snapshot.js';
 import { elapsed, localStamp } from './timefmt.js';
-import { buildWallet, describePhase, loadWalletState, onLedger9, saveWalletState, submitWithRetry, walletStateFile } from './wallet.js';
+import { buildWallet, describePhase, loadWalletState, onLedger9, saveWalletState, submitWithRetry, syncAndSave, walletStateFile } from './wallet.js';
 
 /** Format an error without swallowing a blank message: show _tag, message and cause. */
 const fmtErr = (err: unknown): string => {
@@ -52,7 +54,13 @@ if (process.env.npm_config_dry_run === 'true' && !dryRun) {
   console.error('Put the flag after a lone "--":  npm run hot:sponsor-submit -- --dry-run   (or run: node dist/sponsor-submit.js --dry-run)');
   process.exit(1);
 }
+if (process.env.npm_config_sync_anyway === 'true' && !args.includes('--sync-anyway')) {
+  console.error('npm took --sync-anyway for itself. Put it after a lone "--":  npm run hot:sponsor-submit -- --sync-anyway');
+  process.exit(1);
+}
 const txFile = args.find((a) => !a.startsWith('--')) ?? 'tx.hex';
+/** With no saved sponsor state, refuse a tx.hex that expires sooner than this (a first sync takes hours). --sync-anyway overrides. */
+const FIRST_SYNC_ALLOWANCE_MS = 3 * 3600_000;
 
 // Stop before any file is parsed or any network is contacted if cold-public.json is for another network.
 checkColdPublicNetwork(NETWORK);
@@ -130,21 +138,28 @@ console.log(`Sponsor:  ${keys.unshieldedKeystore.getBech32Address().asString()}`
 const stateFile = walletStateFile(keys);
 
 const saved = await loadWalletState(stateFile);
-console.log(saved ? `Resuming sponsor wallet from ${stateFile}.` : `No saved state (${stateFile}): syncing from scratch, which is slow.`);
+if (saved) {
+  console.log(`Resuming sponsor wallet from ${stateFile} (last saved ${localStamp(statSync(stateFile).mtime)}).`);
+} else {
+  console.log(`No saved state (${stateFile}): this sponsor has not been synced in this folder.`);
+  // A first sync takes hours. A transaction that expires before it ends would be wasted, and an expired shielded spend
+  // means a new feed and a new proof on the cold machine. Keep tx.hex and sync first, separately.
+  const left = details?.expires ? details.expires.getTime() - Date.now() : undefined;
+  if (left !== undefined && left < FIRST_SYNC_ALLOWANCE_MS && !args.includes('--sync-anyway')) {
+    console.error(`tx.hex expires at ${localStamp(details!.expires!)}, in ${elapsed(left)}: too soon for a first sync, which takes hours.`);
+    console.error('Nothing was done; tx.hex is kept. Sync the sponsor first, then run this again before the expiry:');
+    console.error('  npm run hot:sponsor-sync');
+    console.error('(If this is not the sponsor you meant, check SPONSOR_MNEMONIC. To try anyway, add --sync-anyway.)');
+    process.exit(1);
+  }
+  console.log('Syncing from scratch, which is slow (hours). Next time run `npm run hot:sponsor-sync` early, at the first step.');
+}
 const wallet = await buildWallet(keys, saved);
 
-// An unsynced sponsor gets error 170 (InvalidDustSpendProof), so wait for a full sync.
-const syncStarted = Date.now();
-const heartbeat = setInterval(
-  () => console.log(`Still syncing the sponsor wallet (${Math.round((Date.now() - syncStarted) / 1000)} s)...`),
-  30_000,
-);
-const synced = await wallet.waitForSyncedState();
-clearInterval(heartbeat);
-console.log(`Synced in ${elapsed(Date.now() - syncStarted)} (at ${localStamp(new Date())}).`);
-// The first sync can take over an hour: keep it even if anything after this fails (an expired tx.hex, a refused transaction).
-await saveWalletState(wallet, stateFile);
-console.log(`Saved the synced wallet state to ${stateFile}.`);
+// An unsynced sponsor gets error 170 (InvalidDustSpendProof), so wait for a full sync. Progress is printed and saved
+// as it goes (and on Ctrl-C), so an interrupted first sync resumes; the synced state is kept even if anything after this
+// fails (an expired tx.hex, a refused transaction).
+const synced = await syncAndSave(wallet, stateFile);
 if (!saved) beep(3); // alert that the long first sync is done
 
 // A long sync can outlast the TTL. Reject now rather than let adoptTransaction fail with a blank error.

@@ -19,6 +19,7 @@
     "hot:dust-watch": "node dist/dust-watch.js",
     "cold:transfer": "node dist/cold-transfer.js",
     "hot:sponsor-register": "node dist/sponsor-register.js",
+    "hot:sponsor-sync": "node dist/sponsor-sync.js",
     "hot:sponsor-submit": "node dist/sponsor-submit.js",
     "qr:send": "node dist/qr-send.js",
     "qr:decode": "node dist/qr-decode.js",
@@ -35,6 +36,7 @@
     "@midnightntwrk/wallet-sdk-prover-client": "2.0.0",
     "@midnightntwrk/zkir-v2": "2.2.0",
     "@scure/bip39": "2.4.0",
+    "effect": "3.22.4",
     "qrcode-generator": "1.4.4",
     "rxjs": "7.8.2"
   },
