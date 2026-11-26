@@ -10,10 +10,12 @@
 // cold-unshielded.snapshot.json, or SNAPSHOT_FILE, if present), the sponsor's addresses and DUST balance, and an estimate of the DUST
 // fee. Nothing is balanced or locked until you type SUBMIT. Afterwards it shows the fee the final transaction actually declares.
 // It prints the start and finish time so you can see how long each run takes.
+// It checks that the proof server answers (GET /version) before the sync and again before asking for SUBMIT.
 //
 // Verified (11 Nov 2026, Preprod): adoptTransaction, validateTransaction, estimateTransactionFee,
 // balanceFinalizedTransaction, signRecipe, finalizeRecipe and submitTransaction exercised end to end.
-import { ADDITIONAL_FEE_OVERHEAD, NETWORK, NETWORK_ID } from './config.js';
+import { ADDITIONAL_FEE_OVERHEAD, hotEndpoints, NETWORK, NETWORK_ID } from './config.js';
+import { checkProofServer, proofServerHelp } from './proofcheck.js';
 import { checkColdPublicNetwork } from './crosscheck.js';
 import { appendFileSync, existsSync, readFileSync, statSync } from 'node:fs';
 import { createInterface } from 'node:readline/promises';
@@ -144,6 +146,21 @@ try {
   console.warn(`Could not read the transaction's contents (${fmtErr(err)}); the addresses are not shown.`);
 }
 
+// The proof server is only used after SUBMIT, to prove the sponsor's DUST spend. Check it now, before the sync, so a server
+// that is not running (or a PROOF_SERVER_URL not set in this terminal) fails in seconds and not after tx.hex's time is spent.
+const proofServerUrl = hotEndpoints().proofServer;
+const proofServerIsSet = (process.env.PROOF_SERVER_URL ?? '').trim() !== '';
+{
+  const check = await checkProofServer(proofServerUrl);
+  if (!check.ok) {
+    proofServerHelp(check.reason, proofServerIsSet).forEach((l) => console.error(l));
+    console.error('Nothing was done; tx.hex is kept. Run this again once the proof server answers.');
+    beep(2);
+    process.exit(1);
+  }
+  console.log(`Proof server: reachable (version ${check.version})${proofServerIsSet ? ', from PROOF_SERVER_URL' : ''}.`);
+}
+
 const keys = deriveAndWipe(readSeed('SPONSOR'));
 console.log(`Sponsor:  ${keys.unshieldedKeystore.getBech32Address().asString()}`);
 const stateFile = walletStateFile(keys);
@@ -245,6 +262,19 @@ try {
   console.log(`DUST fee estimate not available (${fmtErr(err)}).`);
 }
 console.log('');
+
+// Again, in case the server went away during a long sync: after SUBMIT it is the last thing the transaction needs.
+{
+  const check = await checkProofServer(proofServerUrl);
+  if (!check.ok) {
+    proofServerHelp(check.reason, proofServerIsSet).forEach((l) => console.error(l));
+    console.error('Nothing was balanced or locked; tx.hex is kept and the sponsor state is saved. Run this again once it answers.');
+    await saveWalletState(wallet, stateFile);
+    await wallet.stop();
+    beep(2);
+    process.exit(1);
+  }
+}
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
 beep(); // the prompt is ready

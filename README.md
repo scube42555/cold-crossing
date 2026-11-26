@@ -68,6 +68,8 @@ the snapshot's network or address differs. Every script prints the network it is
 
 The proof server is `http://127.0.0.1:6300` on every network. The docs say it always runs locally because it
 handles private data.
+`sponsor-submit` checks that it answers (`GET /version`) before the sync and again before asking for SUBMIT, so
+a proof server that is not running, or a `PROOF_SERVER_URL` not set in this terminal, stops it early with tx.hex kept.
 
 ```bash
 export MIDNIGHT_NETWORK=preprod
