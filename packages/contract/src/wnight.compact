@@ -1,0 +1,119 @@
+// wNIGHT: a 1:1 shielded wrapper for unshielded (t)NIGHT.
+//
+// Flow:
+// - deposit(amount, nonce): the caller's wallet pays `amount` STAR of NIGHT
+//   into this contract (receiveUnshielded), and the contract mints `amount`
+//   wNIGHT as a shielded coin straight to the caller's shielded coin key.
+// - Holders move wNIGHT between wallets with ordinary shielded transfers.
+//   The contract is not involved.
+// - redeem(coin, recipient): `coin` describes a NEW coin of wNIGHT that this
+//   transaction creates for the contract (the caller's wallet pays for it
+//   from whichever wNIGHT coins it holds, and takes change back). The
+//   contract receives it, burns it in the same transaction, and pays
+//   `coin.value` NIGHT to the unshielded `recipient`.
+//
+// Invariant: totalMinted == totalLocked == this contract's NIGHT balance.
+//   Only deposit and redeem change either total, both by the same amount, and
+//   each change is paired with a NIGHT receive or send of exactly that amount,
+//   which the ledger enforces when it balances the transaction.
+//
+// Double spends: the ledger's nullifier set stops a wallet spending the same
+// wNIGHT coin twice. `redeemed` additionally refuses a replay of the same
+// redeem coin description (defence in depth; see the test suite).
+//
+// Privacy (by design, see HANDOVER.md section 4):
+// - PUBLIC: every deposit and redeem amount, the redeem recipient's
+//   unshielded address, the depositor's NIGHT inputs, the totals.
+// - PRIVATE: which shielded wallet holds wNIGHT between deposit and redeem,
+//   and the shielded transfers between wallets.
+
+pragma language_version 0.28;
+
+import CompactStandardLibrary;
+
+// Domain separator for wNIGHT. Its token color is
+// tokenType(WNIGHT_DOMAIN, this contract's address), so no other contract can
+// mint coins of this color.
+export pure circuit wnightDomain(): Bytes<32> {
+    return pad(32, "wnight:shielded:v1");
+}
+
+// NIGHT held by the contract, in STAR.
+export ledger totalLocked: Uint<128>;
+
+// wNIGHT minted minus wNIGHT burned.
+export ledger totalMinted: Uint<128>;
+
+// Number of deposits so far. Mixed into each mint nonce so that two mints
+// never share a nonce, even if a client reuses one.
+export ledger deposits: Counter;
+
+// Nonces of redeem coins already received.
+export ledger redeemed: Set<Bytes<32>>;
+
+constructor() {
+    totalLocked = 0;
+    totalMinted = 0;
+}
+
+// The wNIGHT token color. Computed in circuits rather than stored at
+// construction, because kernel.self() is not the final address there.
+circuit wnightColor(): Bytes<32> {
+    return tokenType(wnightDomain(), kernel.self());
+}
+
+// Lock `amount` STAR of NIGHT and mint the same amount of wNIGHT to the
+// caller. `nonce` must be fresh and random (the client draws it).
+//
+// A single mint is capped at Uint<64> by the protocol, hence the type.
+export circuit deposit(amount: Uint<64>, nonce: Bytes<32>): [] {
+    const value = disclose(amount);
+    assert(value > 0, "Deposit must be greater than zero");
+
+    // The transaction must pay `value` NIGHT into this contract. The caller's
+    // wallet adds (and signs) the inputs when it balances the transaction.
+    receiveUnshielded(nativeToken(), value as Uint<128>);
+
+    // Mint to the caller. ownPublicKey() is only the recipient, never an
+    // authorisation check: a caller who lies about it pays NIGHT and mints the
+    // coin to someone else's key.
+    const coinNonce = evolveNonce(deposits as Uint<128>, disclose(nonce));
+    mintShieldedToken(
+        wnightDomain(),
+        value,
+        coinNonce,
+        left<ZswapCoinPublicKey, ContractAddress>(ownPublicKey())
+    );
+
+    deposits.increment(1);
+    totalLocked = (totalLocked + value) as Uint<128>;
+    totalMinted = (totalMinted + value) as Uint<128>;
+}
+
+// Burn the wNIGHT coin `coin` and pay `coin.value` STAR of NIGHT to
+// `recipient`. `coin` must be a fresh description with a random nonce, never
+// a copy of one of the wallet's own coins.
+export circuit redeem(coin: ShieldedCoinInfo, recipient: UserAddress): [] {
+    const c = disclose(coin);
+    assert(c.color == wnightColor(), "Coin is not wNIGHT");
+    assert(c.value > 0, "Redeem must be greater than zero");
+    assert(c.value <= totalMinted, "Redeem exceeds wNIGHT supply");
+    assert(c.value <= totalLocked, "Redeem exceeds locked NIGHT");
+    assert(!redeemed.member(c.nonce), "Coin already redeemed");
+
+    // The transaction must create `c` as an output owned by this contract;
+    // the caller's wallet pays for it from its wNIGHT coins.
+    receiveShielded(c);
+    // ...and that same fresh coin is spent straight to the burn address.
+    sendImmediateShielded(c, shieldedBurnAddress(), c.value);
+    redeemed.insert(c.nonce);
+
+    sendUnshielded(
+        nativeToken(),
+        c.value,
+        right<ContractAddress, UserAddress>(disclose(recipient))
+    );
+
+    totalLocked = (totalLocked - c.value) as Uint<128>;
+    totalMinted = (totalMinted - c.value) as Uint<128>;
+}
