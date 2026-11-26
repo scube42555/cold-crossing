@@ -3,9 +3,17 @@
 //
 // Cold mode: suppress each block; emit one "[offline, expected]" line per new event with a running count.
 // Hot mode: one short line per distinct event; recurring events show "(N times)" instead of repeating.
+// Both modes drop the node client's "disconnected ... 1000:: Normal Closure" lines (a clean close).
 // Verbose (LOG_VERBOSE=1): pass everything through unchanged.
 
 export type FilterMode = 'cold' | 'hot' | 'verbose';
+
+/**
+ * True for the node client's report of a connection it closed cleanly (WebSocket code 1000), for example
+ *   2026-11-26 15:05:03        RPC-CORE: subscribeRuntimeVersion(): RuntimeVersion:: disconnected from wss://...: 1000:: Normal Closure
+ * The wallet closes and reopens node connections as it works; a clean close says nothing is wrong. Other close codes still show.
+ */
+export const isNormalClosure = (line: string): boolean => /RPC-CORE: .*disconnected from .*: 1000:: Normal Closure\s*$/.test(line);
 
 /** True if a log line opens an SDK WebSocket connection error. */
 export const isNoisyLine = (line: string): boolean => /^(Wallet\.Sync|API-WS)/.test(line);
@@ -44,7 +52,9 @@ export function makeLogFilter(mode: FilterMode): (chunk: string) => string {
         break;
       }
 
-      if (isNoisyLine(line)) {
+      if (isNormalClosure(line)) {
+        // a clean close: drop it, and leave the burst state as it was
+      } else if (isNoisyLine(line)) {
         if (!lastWasNoisy) {
           eventCount++;
           if (mode === 'cold') {

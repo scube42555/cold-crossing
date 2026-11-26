@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeLogFilter, isNoisyLine } from '../src/logfilter.js';
+import { makeLogFilter, isNoisyLine, isNormalClosure } from '../src/logfilter.js';
 
 test('isNoisyLine: matches Wallet.Sync and API-WS', () => {
   assert.ok(isNoisyLine('Wallet.Sync: [object CloseEvent]'));
@@ -143,4 +143,17 @@ test('chunk without trailing newline is handled', () => {
   const filter = makeLogFilter('hot');
   const out = filter('no newline');
   assert.equal(out, 'no newline');
+});
+
+test('a clean node disconnect (1000 Normal Closure) is dropped in hot and cold mode, kept in verbose', () => {
+  const clean = '2026-11-26 15:05:03        RPC-CORE: subscribeRuntimeVersion(): RuntimeVersion:: disconnected from wss://rpc.example/?project_id=<redacted>: 1000:: Normal Closure';
+  const abnormal = '2026-11-26 15:05:03        RPC-CORE: subscribeRuntimeVersion(): RuntimeVersion:: disconnected from wss://rpc.example/: 1006:: Abnormal Closure';
+  assert.ok(isNormalClosure(clean));
+  assert.ok(!isNormalClosure(abnormal));
+  for (const mode of ['hot', 'cold'] as const) {
+    const filter = makeLogFilter(mode);
+    assert.equal(filter(`before\n${clean}\n${clean}\nafter\n`), 'before\nafter\n');
+    assert.equal(filter(`${abnormal}\n`), `${abnormal}\n`);
+  }
+  assert.equal(makeLogFilter('verbose')(`${clean}\n`), `${clean}\n`);
 });

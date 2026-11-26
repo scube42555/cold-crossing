@@ -127,8 +127,22 @@ const KEPT_COINS_SHOWN = 10;
  * coins are listed from the transaction itself and no balance is shown. The fee is paid in DUST, so the NIGHT total
  * falls only by what is sent to others.
  */
+const expiresLine = (expires: Date, now: Date): string => {
+  const minutes = Math.round((expires.getTime() - now.getTime()) / 60_000);
+  return `Expires:  ${localStamp(expires)}  (${minutes > 0 ? `in ${minutes} min` : 'already expired'})`;
+};
+
 export const describePlan = (d: TxDetails, snap?: SnapshotLike, now: Date = new Date()): string[] => {
   const lines: string[] = [];
+  // A shielded spend moves no unshielded coins: the From/UTXOs block and the snapshot check would only print "unknown" and a
+  // warning about a snapshot that has nothing to do with it. Say so in one line instead.
+  if (d.inputs.length === 0 && d.outputs.length === 0) {
+    lines.push('Unshielded: none. This transaction moves no unshielded coins (a shielded spend).');
+    if (d.contractActions > 0) lines.push(`WARNING:  the transaction contains ${d.contractActions} contract action(s).`);
+    if (d.expires) lines.push(expiresLine(d.expires, now));
+    lines.push('(The fee is paid in DUST by this sponsor wallet.)');
+    return lines;
+  }
   const senders = [...new Set(d.inputs.map((i) => i.address))];
   const spent = new Map<string, bigint>();
   const sent = new Map<string, bigint>();
@@ -210,10 +224,7 @@ export const describePlan = (d: TxDetails, snap?: SnapshotLike, now: Date = new 
     lines.push('Note:     the transfer sits in the transaction\'s "fallible" part, where the SDK puts it by default. If that part failed,');
     lines.push('          the fee would still be taken but the transfer would not happen. See the README ("fallible").');
   }
-  if (d.expires) {
-    const minutes = Math.round((d.expires.getTime() - now.getTime()) / 60_000);
-    lines.push(`Expires:  ${localStamp(d.expires)}  (${minutes > 0 ? `in ${minutes} min` : 'already expired'})`);
-  }
+  if (d.expires) lines.push(expiresLine(d.expires, now));
   lines.push('(Only unshielded inputs and outputs are listed. The fee is paid in DUST by this sponsor wallet.)');
   return lines;
 };

@@ -24,7 +24,7 @@ const detectMode = (): FilterMode => {
 const filterLog = makeLogFilter(detectMode());
 
 const needsProcessing = (text: string): boolean =>
-  text.includes('project_id=') || /^(Wallet\.Sync|API-WS)/m.test(text);
+  text.includes('project_id=') || /^(Wallet\.Sync|API-WS)/m.test(text) || text.includes('1000:: Normal Closure');
 
 const processText = (text: string): string => filterLog(redact(text));
 

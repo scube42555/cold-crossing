@@ -109,3 +109,16 @@ test('describePlan: shows future expiry in minutes', () => {
   const lines = describePlan(details, undefined, now);
   assert.ok(lines.some((l) => l.includes('Expires:') && l.includes('min')));
 });
+
+test('describePlan: a shielded spend (no unshielded coins) gets one line, not the From/UTXOs block or a snapshot warning', () => {
+  const future = new Date(Date.now() + 36 * 60_000);
+  const details = { inputs: [], outputs: [], contractActions: 0, expires: future };
+  const snap = { address: 'mn_addr_preprod1other', available: new Map(), utxos: [] };
+  const lines = describePlan(details, snap as never);
+  const text = lines.join('\n');
+  assert.match(text, /^Unshielded: none\./);
+  assert.match(text, /Expires: .*in 36 min/);
+  assert.doesNotMatch(text, /From:|UTXOs:|WARNING|snapshot/);
+  const withAction = describePlan({ ...details, contractActions: 1 }).join('\n');
+  assert.match(withAction, /WARNING: {2}the transaction contains 1 contract action/);
+});
