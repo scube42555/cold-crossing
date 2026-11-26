@@ -1,5 +1,5 @@
 // Exports the compiled wnight contract for Midnight.js. Generated code lives in
-// contract/src/managed/wnight (run `npm run compile`; gitignored).
+// src/managed/wnight (run `npm run compile`; gitignored).
 import { CompiledContract } from '@midnight-ntwrk/midnight-js-protocol/v9/compact-js';
 import path from 'node:path';
 
