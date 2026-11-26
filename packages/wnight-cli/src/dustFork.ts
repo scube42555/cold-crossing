@@ -37,7 +37,7 @@ type Cached = {
   chain: { height: number; blockHash: string };
 };
 
-const STATE_DIR = fileURLToPath(new URL('../../.wallet-state/', import.meta.url));
+const STATE_DIR = fileURLToPath(new URL('../.wallet-state/', import.meta.url));
 const PROBE_TIMEOUT_MS = Number(process.env['MIDNIGHT_DUST_FORK_PROBE_TIMEOUT_MS'] ?? 120_000);
 const PROBE_ATTEMPTS = 3;
 

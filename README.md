@@ -13,6 +13,11 @@ cold machine refuses a snapshot from before the ledger 9 era. SDK 1.2.0 results 
 Use throwaway wallets and faucet tokens only. A recovery phrase that has appeared on an online machine
 must never hold real funds.
 
+**Becoming cold-crossing (2026-11-26).** The wnight project (the 1:1 shielded wrapper for tNIGHT) has been merged in with its
+history, as `packages/contract` and `packages/wnight-cli` (an online developer CLI; its README is in that folder). Nothing in
+this README changes: the cold and hot scripts are built and run exactly as before, and the cold bundle installs the same
+packages. `MERGE-PLAN.md` has the plan and its phases.
+
 ## Files
 
 | Script | Runs on | Needs a seed? | What it does |

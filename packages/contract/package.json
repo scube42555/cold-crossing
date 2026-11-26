@@ -1,0 +1,22 @@
+{
+  "name": "@cold-crossing/contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "wnight.compact: the 1:1 shielded wrapper for tNIGHT, with simulator tests",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "compile": "compact compile +0.36.1 src/wnight.compact src/managed/wnight",
+    "compile:fast": "compact compile +0.36.1 --skip-zk src/wnight.compact src/managed/wnight",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/midnight-js-protocol": "5.0.1"
+  },
+  "devDependencies": {
+    "vite": "6.4.5",
+    "vitest": "^5.0.4"
+  }
+}

@@ -420,7 +420,7 @@ export async function syncWallet(
 // ---------------------------------------------------------------------------
 // On a long-lived network a sync from genesis takes minutes per wallet, and
 // every suite builds its wallets afresh. So after each sync the three
-// sub-wallets' state is saved to the gitignored repo-root .wallet-state/,
+// sub-wallets' state is saved to the gitignored .wallet-state/ in this package folder,
 // keyed by network ID and a hash of the master seed, and the next build of the
 // same wallet restores it and syncs only the gap. The local devnet is skipped:
 // it starts from a new genesis each time. MIDNIGHT_WALLET_STATE=off turns this
@@ -436,7 +436,7 @@ export async function syncWallet(
 // replaces the file. A version 1 file (from before stamping) is restored as
 // before and gets its stamp on the next save.
 
-const STATE_DIR = fileURLToPath(new URL('../../.wallet-state/', import.meta.url));
+const STATE_DIR = fileURLToPath(new URL('../.wallet-state/', import.meta.url));
 const stateFiles = new WeakMap<WalletFacade, { file: string; indexer: string }>();
 
 type SubWalletStates = { shielded: string; unshielded: string; dust: string };

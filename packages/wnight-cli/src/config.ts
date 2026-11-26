@@ -51,7 +51,7 @@ export const PREVIEW_CONFIG: NetworkConfig = {
 // Preprod goes through Blockfrost. Blockfrost rejects every request without a
 // project token, and the SDK's indexer, wallet and node clients only take URLs,
 // so the token rides along as a `project_id` query parameter. It is read from
-// BLOCKFROST_PROJECT_ID (set it in the gitignored repo-root .env.preprod) and
+// BLOCKFROST_PROJECT_ID (set it in the gitignored .env.preprod) and
 // must never be written into a source file.
 function withBlockfrostKey(url: string, projectId: string): string {
   const sep = url.includes('?') ? '&' : '?';
@@ -64,7 +64,7 @@ export function preprodConfig(): NetworkConfig {
   const projectId = process.env['BLOCKFROST_PROJECT_ID']?.trim();
   if (!projectId) {
     throw new Error(
-      'BLOCKFROST_PROJECT_ID is not set. Add it to the repo-root .env.preprod ' +
+      'BLOCKFROST_PROJECT_ID is not set. Add it to the .env.preprod ' +
         '(gitignored) or export it in your shell.',
     );
   }
@@ -80,7 +80,7 @@ export function preprodConfig(): NetworkConfig {
 }
 
 // A network that exists only in env: e.g. a private or short-lived network whose
-// endpoints arrive late. Set these in the gitignored repo-root .env.custom (see
+// endpoints arrive late. Set these in the gitignored .env.custom (see
 // .env.custom.example), or in the file named by MIDNIGHT_ENV_FILE, which is
 // layered on top of it (vitest.config.ts). Built on demand so it sees that env.
 export function customConfig(): NetworkConfig {
@@ -95,7 +95,7 @@ export function customConfig(): NetworkConfig {
   const missing = required.filter((name) => value(name) === undefined);
   if (missing.length > 0) {
     throw new Error(
-      `MIDNIGHT_NETWORK=custom needs ${missing.join(', ')}. Set them in the repo-root ` +
+      `MIDNIGHT_NETWORK=custom needs ${missing.join(', ')}. Set them in the ` +
         '.env.custom (see .env.custom.example), in the file named by MIDNIGHT_ENV_FILE, ' +
         'or in your shell.',
     );

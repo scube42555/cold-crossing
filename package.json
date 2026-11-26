@@ -1,7 +1,11 @@
 {
-  "name": "midnight-cold-hot-transfer",
+  "name": "cold-crossing",
   "version": "0.1.0",
   "private": true,
+  "workspaces": [
+    "packages/contract",
+    "packages/wnight-cli"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.12"
@@ -29,9 +33,20 @@
     "test:prover-lab": "node scripts/test-prover-lab.mjs",
     "prover-lab:node": "node scripts/prover-lab-node.mjs",
     "hot:zswap-feed": "node dist/hot-zswap-feed.js",
-    "cold:shielded-transfer": "node dist/cold-shielded-transfer.js"
+    "cold:shielded-transfer": "node dist/cold-shielded-transfer.js",
+    "wnight:wallets": "npm run -s -w @cold-crossing/wnight-cli wallets --",
+    "wnight:deploy": "npm run -s -w @cold-crossing/wnight-cli deploy --",
+    "wnight:deposit": "npm run -s -w @cold-crossing/wnight-cli deposit --",
+    "wnight:consolidate": "npm run -s -w @cold-crossing/wnight-cli consolidate --",
+    "wnight:transfer": "npm run -s -w @cold-crossing/wnight-cli transfer --",
+    "wnight:wasm-transfer": "npm run -s -w @cold-crossing/wnight-cli wasm-transfer --",
+    "wnight:redeem": "npm run -s -w @cold-crossing/wnight-cli redeem --",
+    "wnight:typecheck": "npm run -s -w @cold-crossing/wnight-cli typecheck",
+    "contract:compile": "npm run -s -w @cold-crossing/contract compile",
+    "contract:test": "npm run -s -w @cold-crossing/contract test"
   },
   "dependencies": {
+    "@midnightntwrk/ledger-v9": "1.0.1",
     "@midnightntwrk/wallet-sdk": "2.0.0",
     "@midnightntwrk/wallet-sdk-prover-client": "2.0.0",
     "@midnightntwrk/zkir-v2": "2.2.0",

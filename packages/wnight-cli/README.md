@@ -1,8 +1,13 @@
 # wNIGHT — shielded 1:1 wrapper for tNIGHT (Midnight Preprod, test only)
 
+> **Moved into cold-crossing (2026-11-26).** This was the wnight repository. The contract is now `packages/contract`
+> and this CLI is `packages/wnight-cli`. Run the commands below **in this folder**: `.env`, `.wallet-state/`,
+> `.deployment.json` and `midnight-level-db/` live here, as they did in the old wnight folder. From the repository root
+> the same scripts are `npm run wnight:<script> -- <args>` (for example `npm run wnight:wallets -- B`).
+
 Lock unshielded tNIGHT in a Compact contract, get the same amount of a shielded
 token (wNIGHT), move it privately between wallets, and redeem it back to tNIGHT.
-See `../HANDOVER.md` for the background and design.
+See `../../HANDOVER.md` for the background and design.
 
 **Preprod only.** The CLI refuses any `MIDNIGHT_NETWORK` other than `preprod`.
 Never put a seed that holds Mainnet funds in `.env`.
@@ -20,18 +25,18 @@ Never put a seed that holds Mainnet funds in `.env`.
 The official token tutorials still show ledger 8 versions (compactc 0.31.1,
 Midnight.js 4.1.1, wallet SDK 1.2.0), which Preprod no longer accepts. This
 project follows the ledger 9 `midnight-examples` repo instead
-(`examples/private-tip-jar`, `examples/private-party`). `cli/src/wallet.ts`,
-`cli/src/config.ts`, `contract/src/test/sim.ts` and `contract/src/test/coins.ts`
+(`examples/private-tip-jar`, `examples/private-party`). `src/wallet.ts`,
+`src/config.ts`, `../contract/src/test/sim.ts` and `../contract/src/test/coins.ts`
 are copied from it (Apache-2.0).
 
 ## Layout
 
 ```
-contract/src/wnight.compact          the contract (deposit, redeem)
-contract/src/index.ts                CompiledContract wrapper for Midnight.js
-contract/src/test/wnight.sim.test.ts in-memory simulator tests
-cli/src/wallets.ts                   wallets A/B from .env, DUST, Preprod guard
-cli/src/{deploy,deposit,transfer,redeem}.ts
+../contract/src/wnight.compact          the contract (deposit, redeem)
+../contract/src/index.ts                CompiledContract wrapper for Midnight.js
+../contract/src/test/wnight.sim.test.ts in-memory simulator tests
+src/wallets.ts                   wallets A/B from .env, DUST, Preprod guard
+src/{deploy,deposit,transfer,redeem}.ts
 ```
 
 ## Contract tests (no network, no funds)
@@ -96,6 +101,6 @@ accepted (block 3,578,130, status SUCCESS). A single shielded output takes about
 - NIGHT locked in the contract no longer generates DUST for the depositor.
 - First wallet sync on Preprod: the shielded part takes minutes, DUST about
   2 hours (measured with a fresh wallet via Blockfrost). DUST starts at the
-  ledger 9 fork thanks to `cli/src/dustFork.ts`; without it the SDK's own
+  ledger 9 fork thanks to `src/dustFork.ts`; without it the SDK's own
   fork search times out on Blockfrost and DUST replays from genesis (~1 day).
   Progress is saved every 5 minutes and on Ctrl-C, so a run can be resumed.

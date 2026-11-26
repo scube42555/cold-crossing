@@ -14,5 +14,5 @@
     "verbatimModuleSyntax": true,
     "noEmit": true
   },
-  "include": ["contract/src/**/*.ts", "cli/src/**/*.ts"]
+  "include": ["src/**/*.ts", "../contract/src/**/*.ts"]
 }

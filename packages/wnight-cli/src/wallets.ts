@@ -151,7 +151,7 @@ export function providersFor(w: MidnightWalletProvider, config: NetworkConfig): 
 
 export type Deployment = { networkId: string; contractAddress: string; wnightColor: string; deployedAt: string };
 
-const DEPLOYMENT_FILE = fileURLToPath(new URL('../../.deployment.json', import.meta.url));
+const DEPLOYMENT_FILE = fileURLToPath(new URL('../.deployment.json', import.meta.url));
 
 export function saveDeployment(d: Deployment): void {
   writeFileSync(DEPLOYMENT_FILE, JSON.stringify(d, null, 2) + '\n');

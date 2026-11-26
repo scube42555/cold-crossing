@@ -18,6 +18,7 @@ even a viewing key; the cold machine rebuilds its coins, proves **locally** in W
 
 | Path | Role |
 |---|---|
+| `packages/contract`, `packages/wnight-cli` | wnight, merged in 2026-11-26 with its history (`MERGE-PLAN.md`, phase 1): the wNIGHT contract with its vitest simulator tests, and its **online** developer CLI (keys on that machine, `.env` and `.wallet-state/` in its own folder). npm workspaces; never part of the cold bundle. Root scripts `wnight:*`, `contract:*`. |
 | `src/config.ts` | Network (`MIDNIGHT_NETWORK`), endpoints, wallet config, the chain-version probe. **Its first import must stay `./redact.js`.** |
 | `src/keys.ts` | Reads secrets from the environment, derives `WalletSeeds` and the keystore (`deriveAndWipe`). Roles: `COLD_*`, `SPONSOR_*`. |
 | `src/cold-export-public.ts`, `cold-transfer.ts`, `probe-cold-era.ts` | Cold machine. `cold-transfer` is offline: stub prover and submission, wallets start from seeds. |
@@ -95,7 +96,7 @@ by the network); hot scripts stop if `cold-public.json` names another network. T
 ## Version control (full rules in `CONTRIBUTING.md`)
 
 - **Do not commit, push, tag or rewrite history unless asked.** Stage named files, never `git add -A`; read `git status` first. Wallet data (`*.snapshot.json`, `tx.hex`,
-  `cold-public.json`, `wallet-state-*.json`, `.env`, `*.mqr`, `received-*`) is never staged and its `.gitignore` entries never loosened.
+  `cold-public.json`, `wallet-state-*.json`, `.env`, `*.mqr`, `received-*`, and wnight's `.wallet-state/`, `midnight-level-db/`, `.deployment.json`) is never staged and its `.gitignore` entries never loosened.
 - **Never bypass `.githooks/pre-commit`** (`--no-verify`, or `allow-secret` to force a commit through). If it blocks, stop and tell the owner what it flagged.
 - Commits: `type(scope): summary` plus honest trailers `Verified:` (`not run`, `tsc only`, `unit tests`, `preprod T3-T5`) and `Touches-cold: yes|no`. Cold-side files:
   `cold-*`, `keygen`, `qr-send`, `qr-decode`, `config`, `keys`, `hex`, `mqr`, `mqr-core`, `qr-render`, `redact`, `snapshot`, `tools/qr_scan.py`, the production dependencies,

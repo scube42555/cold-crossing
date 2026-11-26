@@ -1,5 +1,4 @@
 node_modules/
-contract/src/managed/
 .env
 .env.*
 !.env.example
