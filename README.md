@@ -17,7 +17,9 @@ must never hold real funds.
 history, as `packages/contract` and `packages/wnight-cli` (an online developer CLI; its README is in that folder). The
 sources of the cold and hot scripts moved from `src/` to `packages/core`, `packages/cold` and `packages/hot`. Nothing else in
 this README changes: the cold and hot scripts are built and run exactly as before, and the cold bundle installs the same
-packages. `MERGE-PLAN.md` has the plan and its phases.
+packages. The repository and its folder are now named `cold-crossing` (formerly `midnight-cold-hot`; GitHub redirects the old
+URL), and so is the folder inside the cold bundle: on the cold machine, `cd cold-crossing`. `MERGE-PLAN.md` has the
+plan and its phases.
 
 ## Files
 
@@ -263,6 +265,7 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T45 *new* | Early warnings: `hot-watch` / `hot-zswap-feed` with no `wallet-state-*.json` in the folder warn; `sponsor-submit` with no state and a `tx.hex` expiring within 3 h stops and keeps it | Notice logic passed (`npm test`); hot page check and sync button passed with stand-ins (`npm run test:server`). On Preprod: **not yet run** |
 | T46 *new* | `sponsor-submit` checks the proof server (`GET /version`) before the sync and before `SUBMIT`; an unreachable one stops it with `tx.hex` kept | Check logic passed (`npm test`); against the real servers the unset local default fails and the LAN proof server answers 9.0.2. On Preprod (26 Nov 2026) a real run printed "Proof server: reachable (version 9.0.2)" and went on. The stop on Preprod: **not yet run** |
 | T47 *new* | `receiver.html` outlines the frame it read last and says how many frames until the next missing one | Passed in headless Chromium with pasted frames (26 Nov 2026). With a camera: **not yet run** |
+| T48 *new* | The cold-crossing merge (`MERGE-PLAN.md` phase 1) changes no flow: same scripts in `dist/`, same bundle, cold code reaches for no network | Passed (26 Nov 2026), on Node 22.23.4: every suite; the `dist/` JavaScript identical apart from three import lines; the cold page's SHA-256 unchanged; the bundle from `packages/cold/bundle/` installs the same 119 packages as before the merge; `cold-export-public` and `cold-shielded-transfer --address` under `unshare -rn`; `tests/boundary.test.ts`. The wnight CLI ran `wallets` on Preprod from `packages/wnight-cli`. A cold transfer from a rebuilt bundle: **not yet run** |
 
 **How the new tests are run**
 
@@ -332,7 +335,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
 
    ```bash
    NODE_TGZ=~/Downloads/node-v22.23.4-linux-x64.tar.gz     # adjust
-   PROJECT=~/path/to/midnight-cold-hot                     # adjust
+   PROJECT=~/path/to/cold-crossing                     # adjust
    cd "$(dirname "$NODE_TGZ")"
    grep node-v22.23.4-linux-x64.tar.gz SHASUMS256.txt | sha256sum -c -
    ```
@@ -353,13 +356,13 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
 
    ```bash
    BUNDLE=~/cold-bundle
-   rm -rf "$BUNDLE" && mkdir -p "$BUNDLE/midnight-cold-hot"
+   rm -rf "$BUNDLE" && mkdir -p "$BUNDLE/cold-crossing"
    cp "$NODE_TGZ" "$BUNDLE/"
-   cp packages/cold/bundle/package.json packages/cold/bundle/package-lock.json "$BUNDLE/midnight-cold-hot/"
-   cp -r dist "$BUNDLE/midnight-cold-hot/"
-   cp README.md "$BUNDLE/midnight-cold-hot/"
-   cp -r prover-keys "$BUNDLE/midnight-cold-hot/"    # only needed for shielded spends (section 13)
-   cd "$BUNDLE/midnight-cold-hot"
+   cp packages/cold/bundle/package.json packages/cold/bundle/package-lock.json "$BUNDLE/cold-crossing/"
+   cp -r dist "$BUNDLE/cold-crossing/"
+   cp README.md "$BUNDLE/cold-crossing/"
+   cp -r prover-keys "$BUNDLE/cold-crossing/"    # only needed for shielded spends (section 13)
+   cd "$BUNDLE/cold-crossing"
    npm ci --omit=dev --ignore-scripts
    find node_modules \( -name '*.node' -o -name '*.so' \)    # expect only @msgpackr-extract/... (see below)
    du -sh .
@@ -383,7 +386,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    ```bash
    mkdir -p /tmp/ct && tar -xzf "$BUNDLE/node-v22.23.4-linux-x64.tar.gz" -C /tmp/ct
    NODE=/tmp/ct/node-v22.23.4-linux-x64/bin/node
-   rm -rf /tmp/ct/test && cp -r "$BUNDLE/midnight-cold-hot" /tmp/ct/test && cd /tmp/ct/test
+   rm -rf /tmp/ct/test && cp -r "$BUNDLE/cold-crossing" /tmp/ct/test && cd /tmp/ct/test
    COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-export-public.js
    # shielded spends (section 13): prints a mn_shield-addr_... address, offline
    COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-shielded-transfer.js --address
@@ -399,8 +402,8 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    reports (`python3 --version` on the cold machine):
 
    ```bash
-   cp -r "$PROJECT/tools" "$BUNDLE/midnight-cold-hot/"
-   cp -r "$PROJECT/pylibs" "$BUNDLE/midnight-cold-hot/"
+   cp -r "$PROJECT/tools" "$BUNDLE/cold-crossing/"
+   cp -r "$PROJECT/pylibs" "$BUNDLE/cold-crossing/"
    ```
 
    Then pack and hash. The archive includes `tools/` and `pylibs/` if you copied them:
@@ -421,14 +424,14 @@ Only `cold-bundle.tar.gz`. It contains:
 | In the bundle | Why |
 |---|---|
 | `node-v22.23.4-linux-x64.tar.gz` | The Node runtime |
-| `midnight-cold-hot/package.json` | Needed for ES module loading |
-| `midnight-cold-hot/package-lock.json` | Records exact versions |
-| `midnight-cold-hot/dist/` | The compiled scripts and `receiver.html` |
-| `midnight-cold-hot/node_modules/` | Production dependencies only |
-| `midnight-cold-hot/prover-keys/` | Public proving keys for shielded spends (section 13), with `SHA256SUMS`. Only if you spend shielded coins |
-| `midnight-cold-hot/tools/` | `qr_scan.py`, the Python QR scanner. Only if you use it |
-| `midnight-cold-hot/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
-| `midnight-cold-hot/README.md` | These instructions, to read on the cold machine |
+| `cold-crossing/package.json` | Needed for ES module loading |
+| `cold-crossing/package-lock.json` | Records exact versions |
+| `cold-crossing/dist/` | The compiled scripts and `receiver.html` |
+| `cold-crossing/node_modules/` | Production dependencies only |
+| `cold-crossing/prover-keys/` | Public proving keys for shielded spends (section 13), with `SHA256SUMS`. Only if you spend shielded coins |
+| `cold-crossing/tools/` | `qr_scan.py`, the Python QR scanner. Only if you use it |
+| `cold-crossing/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
+| `cold-crossing/README.md` | These instructions, to read on the cold machine |
 
 Leave out `packages/`, your dev `node_modules`, `.env`, any `wallet-state-*.json`, snapshots, your Blockfrost token, and
 `cold-public.json`. Later the cold machine receives the snapshot (by QR or USB) and sends back `tx.hex`.
@@ -443,7 +446,7 @@ tar -xzf cold-bundle.tar.gz && cd cold-bundle
 tar -xzf node-v22.23.4-linux-x64.tar.gz
 export PATH="$PWD/node-v22.23.4-linux-x64/bin:$PATH"
 node --version                          # v22.23.4
-cd midnight-cold-hot
+cd cold-crossing
 node -e "import('@midnightntwrk/wallet-sdk/ledger/v9').then(() => console.log('ledger loads'))"
 # with the Python scanner:
 PYTHONPATH=pylibs python3 -c "import cv2, numpy; print(cv2.__version__)"

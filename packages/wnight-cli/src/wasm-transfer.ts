@@ -42,8 +42,8 @@ await runScript(async (opened) => {
   if (!toSelf) {
     // Early, so the slow sync can run while this proves: the cold-hot shielded flow ends with sponsor-submit.
     logger.info(
-      "If this pays a cold wallet for midnight-cold-hot's shielded flow: that flow ends with sponsor-submit, which needs the " +
-        'sponsor wallet synced. Start `npm run hot:sponsor-sync` in the midnight-cold-hot folder now, so it is ready.',
+      "If this pays a cold wallet for cold-crossing's shielded flow: that flow ends with sponsor-submit, which needs the " +
+        'sponsor wallet synced. Start `npm run hot:sponsor-sync` in the cold-crossing folder now, so it is ready.',
     );
   }
 
