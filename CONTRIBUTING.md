@@ -10,7 +10,7 @@ machine**, and **saying honestly how far a change has been tested**.
 git config core.hooksPath .githooks      # turn on the pre-commit guard
 git config commit.template .gitmessage   # message template with the trailers below
 nvm use                                  # Node 22 (.nvmrc); the cold bundle uses an exact 22.x tarball
-npm ci                                   # exact versions from package-lock.json
+npm ci --ignore-scripts                  # exact versions from package-lock.json, no install scripts
 ```
 
 Strongly recommended, because the cold bundle is built from this repository: sign commits and tags.
@@ -101,6 +101,12 @@ These run on the machine that holds the seed. A change to any of them gets a sec
 
 - Pin exact versions. No `^` or `~`.
 - Change dependencies in their own commit (`build(deps): ...`) together with the lockfile, and read the lockfile diff.
+- Two lockfiles. The root `package-lock.json` is the whole project (with the wnight workspaces); the cold bundle installs
+  from `packages/cold/bundle/` (README section 5), which has the root `dependencies` and nothing else. After a change to
+  the root `dependencies`, copy them into `packages/cold/bundle/package.json` and run, in that folder,
+  `npm install --package-lock-only --ignore-scripts --omit=dev`. Use Node 22.23.4's own npm (10.9.9) for both lockfiles:
+  npm 11 writes a root lockfile that npm 10 refuses. `npm test` checks that the two agree and that the cold one holds no
+  Docker or SSH client (`tests/boundary.test.ts`).
 - Before and after: `npm ls --omit=dev --all` and `find node_modules \( -name '*.node' -o -name '*.so' \)`. A new package or a
   new native add-on on the production side is a cold-side change.
 

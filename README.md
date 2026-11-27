@@ -344,7 +344,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    export PATH="$HOME/node22/node-v22.23.4-linux-x64/bin:$PATH"
    node --version                      # must print v22.23.4
    cd "$PROJECT"
-   npm ci                              # all dependencies, including dev, from the lockfile
+   npm ci --ignore-scripts             # all dependencies, including dev, from the lockfile; no install scripts
    npm run build                       # writes dist/, dist/receiver.html and dist/cold-page.html
    npm run fetch:prover-keys           # prover-keys/: 8 public files (~26 MB) for shielded spends (section 13)
    ```
@@ -355,18 +355,25 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    BUNDLE=~/cold-bundle
    rm -rf "$BUNDLE" && mkdir -p "$BUNDLE/midnight-cold-hot"
    cp "$NODE_TGZ" "$BUNDLE/"
-   cp package.json package-lock.json "$BUNDLE/midnight-cold-hot/"
+   cp packages/cold/bundle/package.json packages/cold/bundle/package-lock.json "$BUNDLE/midnight-cold-hot/"
    cp -r dist "$BUNDLE/midnight-cold-hot/"
    cp README.md "$BUNDLE/midnight-cold-hot/"
    cp -r prover-keys "$BUNDLE/midnight-cold-hot/"    # only needed for shielded spends (section 13)
    cd "$BUNDLE/midnight-cold-hot"
    npm ci --omit=dev --ignore-scripts
-   find node_modules \( -name '*.node' -o -name '*.so' \)    # expect no output
+   find node_modules \( -name '*.node' -o -name '*.so' \)    # expect only @msgpackr-extract/... (see below)
    du -sh .
    ```
 
+   The bundle's `package.json` and lockfile come from `packages/cold/bundle/`, not the project root: the root lockfile
+   also holds the wnight packages' tree, whose test kit npm 10 would otherwise pull onto the cold machine (Docker and SSH
+   clients). The two hold the same versions; `npm test` checks it. With Node 22.23.4's npm the bundle has 119 packages.
+
    `package.json` is required offline because `"type": "module"` in it makes the `dist/*.js` files load as ES modules.
-   Native files in the `find` output would need to match the cold CPU and glibc, so look into them before going on.
+   Native files in the `find` output would need to match the cold CPU and glibc, so look into them before going on. The
+   only ones expected are the prebuilt files of `@msgpackr-extract/msgpackr-extract-linux-x64`, an optional speed-up of
+   `msgpackr` (wallet SDK → `@effect/platform` → `msgpackr`), which works without it. They were in the bundle before
+   the merge too; this README used to say to expect none.
    If `--ignore-scripts` breaks a package that needs an install script, step 4 will fail and show it.
 
    The Python QR scanner (`tools/` and `pylibs/`) is added in step 5, just before packing, if you use it.

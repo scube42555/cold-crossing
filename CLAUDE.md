@@ -38,7 +38,7 @@ even a viewing key; the cold machine rebuilds its coins, proves **locally** in W
 
 ## Commands
 
-`npm ci`, then `npm run build` (tsc, `dist/receiver.html`, `dist/cold-page.html` and `dist/hot-page.html`). **Scripts run from `dist/`, not from the sources in `packages/`:** rebuild after every edit. Typecheck with `npm run typecheck`.
+`npm ci --ignore-scripts`, then `npm run build` (tsc, `dist/receiver.html`, `dist/cold-page.html` and `dist/hot-page.html`). **Scripts run from `dist/`, not from the sources in `packages/`:** rebuild after every edit. Typecheck with `npm run typecheck`.
 Run scripts with `node dist/<name>.js` or the npm scripts (`cold:export-public`, `hot:watch`, `cold:transfer`, `hot:sponsor-register`, `hot:sponsor-sync`, `hot:sponsor-submit`, `probe:cold-era`).
 **npm swallows flags:** write `npm run <script> -- --dry-run`. Env: `MIDNIGHT_NETWORK` (default `preprod`), `BLOCKFROST_PROJECT_ID`, `PROOF_SERVER_URL`,
 `COLD_MNEMONIC`/`COLD_PASSPHRASE`, `SPONSOR_MNEMONIC`/`SPONSOR_PASSPHRASE`, plus `ASSUME_LEDGER9`, `TTL_MINUTES`, `SNAPSHOT_FILE`, `COLD_PUBLIC_FILE`,
@@ -55,6 +55,7 @@ network; the owner runs secret-bearing steps in their own terminal.
 - `cold-transfer` must never succeed in reaching a network: every endpoint is an unreachable placeholder, submission is a stub that rejects, and the prover stub
   rejects. Its `facade.start(seeds)` is required by SDK 2 and starts a sync that fails; the `Wallet.Sync` / `API-WS` error lines are expected and harmless.
 - Cold scripts must not import `wallet.ts` or need an indexer or node. `cold-shielded-transfer` must also never use a proof server: a spend's proof input holds the coin secret key. The hot machine never receives the cold seed, passphrase or any secret key.
+- The cold bundle installs from `packages/cold/bundle/` (its own `package.json` and lockfile, the root `dependencies` only), never from the root lockfile, which also holds wnight's test kit (Docker and SSH clients). Keep the two in step as CONTRIBUTING.md says, with Node 22.23.4's npm; `tests/boundary.test.ts` checks it, and that core and cold import no network module and nothing from hot.
 - Production dependencies are copied to the cold machine and can read the seed. Add few, pin exact versions, prefer zero-dependency pure JS, avoid native add-ons.
   `msgpackr-extract` native files currently ship; whether to drop them is the owner's decision (`--omit=optional` is untested).
 
