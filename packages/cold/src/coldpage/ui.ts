@@ -28,7 +28,7 @@ import {
   wholeSeconds,
 } from './core.js';
 import { deriveAddressOnly, deriveColdKeys } from './keys.js';
-import { type Frame, decodeFramesWeb, encodeFramesWeb, parseFrame, payloadDigest } from './mqr-web.js';
+import { type Frame, decodeFramesWeb, encodeFramesWeb, parseFrame, payloadDigest } from '../mqr-web.js';
 
 // jsqr is a CommonJS bundle: depending on the tool that reads it, the function is the module itself or its `default`.
 const jsQR: typeof jsqrModule.default = jsqrModule.default ?? (jsqrModule as unknown as typeof jsqrModule.default);

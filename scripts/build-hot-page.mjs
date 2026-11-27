@@ -4,10 +4,12 @@
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import { entry, packagesSrc } from './packages-src.mjs';
 
 const result = await build({
-  entryPoints: ['src/hotpage/ui.ts'],
+  entryPoints: [entry('hot', 'hotpage/ui.ts')],
   bundle: true,
+  plugins: [packagesSrc],
   format: 'iife',
   platform: 'browser',
   target: 'es2022',

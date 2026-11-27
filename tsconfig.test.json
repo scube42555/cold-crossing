@@ -1,11 +1,12 @@
 {
-  "extends": "./tsconfig.json",
+  // The tests import the built scripts by the package's own name ("cold-crossing/txinfo.js" is dist/txinfo.js, typed by
+  // dist-types/), so they test what the cold bundle ships. npm test runs tsc -b first.
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist-test"
   },
   "include": [
-    "src/**/*.ts",
     "tests/**/*.ts",
     "tests-sdk/**/*.ts"
   ]

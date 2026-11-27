@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDust, amountText, NIGHT, readTransaction, describePlan } from '../src/txinfo.js';
+import { formatDust, amountText, NIGHT, readTransaction, describePlan } from 'cold-crossing/txinfo.js';
 
 // --- formatDust ---
 

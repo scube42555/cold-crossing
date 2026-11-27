@@ -7,7 +7,7 @@
 import jsqrModule from 'jsqr';
 import qrcode from 'qrcode-generator';
 import { DEFAULT_MAX_OUTPUT_BYTES } from '../mqr-core.js';
-import { type Frame, decodeFramesWeb, encodeFramesWeb, parseFrame, payloadDigest } from '../coldpage/mqr-web.js';
+import { type Frame, decodeFramesWeb, encodeFramesWeb, parseFrame, payloadDigest } from '../mqr-web.js';
 import { NIGHT, amountText } from '../txinfo.js';
 import { localStamp } from '../timefmt.js';
 

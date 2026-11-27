@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.wallet-state/
+.deployment.json
+*.log
+logs/
+midnight-level-db/

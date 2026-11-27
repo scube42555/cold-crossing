@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectSnapshot, assertSnapshotFor, assertLedger9 } from '../src/snapshot.js';
+import { inspectSnapshot, assertSnapshotFor, assertLedger9 } from 'cold-crossing/snapshot.js';
 
 const ZERO64 = '0'.repeat(64);
 const HASH64 = 'a'.repeat(64);

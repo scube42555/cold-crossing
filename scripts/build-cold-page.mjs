@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { entry, packagesSrc } from './packages-src.mjs';
 
 // The ledger package exports only its entry points, so find its folder the way Node would from the SDK that depends
 // on it: the nearest node_modules above the SDK that holds it.
@@ -66,13 +67,13 @@ const ledgerPlugin = {
 };
 
 const result = await build({
-  entryPoints: ['src/coldpage/ui.ts'],
+  entryPoints: [entry('cold', 'coldpage/ui.ts')],
   bundle: true,
   format: 'iife',
   platform: 'browser',
   target: 'es2022',
   loader: { '.wasm': 'binary' },
-  plugins: [ledgerPlugin],
+  plugins: [packagesSrc, ledgerPlugin],
   minify: false, // the page is read by people; the size is the WebAssembly module either way
   legalComments: 'inline',
   charset: 'ascii',

@@ -1,18 +1,10 @@
 {
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
-    "types": [
-      "node"
-    ],
-    "strict": true,
-    "outDir": "dist",
-    "rootDir": "src",
-    "esModuleInterop": true,
-    "skipLibCheck": true
-  },
-  "include": [
-    "src/**/*.ts"
+  // The build: tsc -b compiles packages/core, packages/cold and packages/hot into dist/. cold and hot may import core;
+  // neither may import the other (each one's rootDirs lists only itself and core, so such an import does not compile).
+  "files": [],
+  "references": [
+    { "path": "packages/core" },
+    { "path": "packages/cold" },
+    { "path": "packages/hot" }
   ]
 }

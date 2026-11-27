@@ -3,10 +3,10 @@
 import { Unzlib, zlibSync } from 'fflate';
 import { sha256 } from '@noble/hashes/sha2.js';
 import { base64urlnopad } from '@scure/base';
-import { toHex } from '../hex.js';
-import { DEFAULT_CHUNK_CHARS, DEFAULT_MAX_OUTPUT_BYTES, checkEncodeArgs, joinFrames, splitIntoFrames } from '../mqr-core.js';
+import { toHex } from './hex.js';
+import { DEFAULT_CHUNK_CHARS, DEFAULT_MAX_OUTPUT_BYTES, checkEncodeArgs, joinFrames, splitIntoFrames } from './mqr-core.js';
 
-export { parseFrame, type Frame } from '../mqr-core.js';
+export { parseFrame, type Frame } from './mqr-core.js';
 
 const checksum = (compressed: Uint8Array): string => toHex(sha256(compressed)).slice(0, 32);
 

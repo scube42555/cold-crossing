@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as L from '@midnightntwrk/wallet-sdk/ledger/v9';
-import { buildShieldedTransfer, planSpend, rebuildFromFeed, spendTtl } from '../src/coldshielded.js';
-import { inspectFeed } from '../src/zswapfeed.js';
+import { buildShieldedTransfer, planSpend, rebuildFromFeed, spendTtl } from 'cold-crossing/coldshielded.js';
+import { inspectFeed } from 'cold-crossing/zswapfeed.js';
 
 const text = readFileSync(new URL('../../tests/fixtures/zswap-feed-preprod.json', import.meta.url), 'utf8');
 const freshKeys = () => L.ZswapSecretKeys.fromSeed(new Uint8Array(randomBytes(32)));

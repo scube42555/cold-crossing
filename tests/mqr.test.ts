@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
-import { decodeMqrText, encodeFrames, parseFrame } from '../src/mqr.js';
-import { decodeFramesWeb, encodeFramesWeb } from '../src/coldpage/mqr-web.js';
+import { decodeMqrText, encodeFrames, parseFrame } from 'cold-crossing/mqr.js';
+import { decodeFramesWeb, encodeFramesWeb } from 'cold-crossing/mqr-web.js';
 
 const session = (): Uint8Array => randomBytes(3);
 // Text that compresses, followed by bytes that do not, so several frames are needed.

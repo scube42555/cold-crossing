@@ -10,7 +10,7 @@ machine**, and **saying honestly how far a change has been tested**.
 git config core.hooksPath .githooks      # turn on the pre-commit guard
 git config commit.template .gitmessage   # message template with the trailers below
 nvm use                                  # Node 22 (.nvmrc); the cold bundle uses an exact 22.x tarball
-npm ci                                   # exact versions from package-lock.json
+npm ci --ignore-scripts                  # exact versions from package-lock.json, no install scripts
 ```
 
 Strongly recommended, because the cold bundle is built from this repository: sign commits and tags.
@@ -40,7 +40,7 @@ addresses in documentation and tests.
 
 ## Branches
 
-- `main` always builds (`npm run build`) and typechecks (`npx tsc --noEmit`). Do not commit to it directly.
+- `main` always builds (`npm run build`) and typechecks (`npm run typecheck`). Do not commit to it directly.
 - Work on short branches named `feat/<topic>`, `fix/<topic>`, `docs/<topic>`, `build/<topic>`.
 - Merge by pull request, squashed, even if you are the only author. Read the diff once before merging.
 - Rebase on `main` before merging. Do not force-push a branch someone else uses.
@@ -85,22 +85,28 @@ Touches-cold: yes
 These run on the machine that holds the seed. A change to any of them gets a second look, a fresh cold bundle, and
 `Touches-cold: yes`:
 
-- `src/` files: `cold-export-public`, `cold-transfer`, `cold-shielded-transfer`, `keygen`, `qr-send`, `qr-decode`, and everything
+- `packages/cold/src/` and `packages/core/src/` files: `cold-export-public`, `cold-transfer`, `cold-shielded-transfer`, `keygen`, `qr-send`, `qr-decode`, and everything
   they import: `config`, `keys`, `hex`, `mqr`, `mqr-core`, `qr-render`, `redact`, `snapshot`, `coldshielded`, `zswapfeed`, `timefmt`.
-- The cold page (`dist/cold-page.html`): `src/coldpage/`, `cold-page/cold-page.template.html`, `scripts/build-cold-page.mjs`, the
+- The cold page (`dist/cold-page.html`): `packages/cold/src/coldpage/`, `cold-page/cold-page.template.html`, `scripts/build-cold-page.mjs`, the
   modules it bundles (`mqr-core`, `snapshot`, `txinfo`, `timefmt`, `hex`), and **every package the build prints as inlined**, including
   the devDependencies `fflate`, `@noble/hashes`, `@scure/base` and `jsqr`: inside the page they run next to the recovery phrase.
   `esbuild` writes the page, so an `esbuild` change is a cold-side change too.
 - `tools/qr_scan.py`.
 - The **production dependency set** (`dependencies` in `package.json` and its lockfile entries), because every package in
   `node_modules` can read the seed.
-- `src/` files that only run on the hot machine (`hot-watch`, `sponsor-*`, `wallet`, `crosscheck`, `beep`)
+- `packages/hot/src/` files, which only run on the hot machine (`hot-watch`, `sponsor-*`, `wallet`, `crosscheck`, `beep`),
   are not in that list. Anything they add must not leak into the cold imports.
 
 ## Dependencies
 
 - Pin exact versions. No `^` or `~`.
 - Change dependencies in their own commit (`build(deps): ...`) together with the lockfile, and read the lockfile diff.
+- Two lockfiles. The root `package-lock.json` is the whole project (with the wnight workspaces); the cold bundle installs
+  from `packages/cold/bundle/` (README section 5), which has the root `dependencies` and nothing else. After a change to
+  the root `dependencies`, copy them into `packages/cold/bundle/package.json` and run, in that folder,
+  `npm install --package-lock-only --ignore-scripts --omit=dev`. Use Node 22.23.4's own npm (10.9.9) for both lockfiles:
+  npm 11 writes a root lockfile that npm 10 refuses. `npm test` checks that the two agree and that the cold one holds no
+  Docker or SSH client (`tests/boundary.test.ts`).
 - Before and after: `npm ls --omit=dev --all` and `find node_modules \( -name '*.node' -o -name '*.so' \)`. A new package or a
   new native add-on on the production side is a cold-side change.
 

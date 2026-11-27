@@ -21,7 +21,7 @@ export const zkirDir = findPackageDir('@midnightntwrk/zkir-v2');
 
 const { V9KeyMaterial } = await import(pathToFileURL(join(proverClientDir, 'dist', 'effect', 'KeyMaterial.js')).href);
 
-/** @type {import('../src/proverlab/core.js').Pins} */
+/** @type {import('../packages/cold/src/proverlab/core.js').Pins} */
 export const pins = {
   generation: V9KeyMaterial.generation,
   files: Object.fromEntries(Object.entries(V9KeyMaterial.files).filter(([name]) => name.startsWith('zswap/output.'))),

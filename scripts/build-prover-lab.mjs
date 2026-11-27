@@ -8,6 +8,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { build } from 'esbuild';
+import { entry, packagesSrc } from './packages-src.mjs';
 import { pins, pinsSource, zkirDir } from './prover-lab-pins.mjs';
 
 // The ledger: found and started exactly as build-cold-page.mjs does (kept in step by hand; see that file for why).
@@ -74,13 +75,13 @@ const virtualPlugin = {
 };
 
 const result = await build({
-  entryPoints: ['src/proverlab/ui.ts'],
+  entryPoints: [entry('cold', 'proverlab/ui.ts')],
   bundle: true,
   format: 'iife',
   platform: 'browser',
   target: 'es2022',
   loader: { '.wasm': 'binary' },
-  plugins: [virtualPlugin],
+  plugins: [packagesSrc, virtualPlugin],
   define: { __PINS__: JSON.stringify(pins), __PINS_SOURCE__: JSON.stringify(pinsSource) },
   minify: false,
   legalComments: 'inline',

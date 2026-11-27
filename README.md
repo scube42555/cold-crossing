@@ -13,6 +13,14 @@ cold machine refuses a snapshot from before the ledger 9 era. SDK 1.2.0 results 
 Use throwaway wallets and faucet tokens only. A recovery phrase that has appeared on an online machine
 must never hold real funds.
 
+**Becoming cold-crossing (2026-11-26).** The wnight project (the 1:1 shielded wrapper for tNIGHT) has been merged in with its
+history, as `packages/contract` and `packages/wnight-cli` (an online developer CLI; its README is in that folder). The
+sources of the cold and hot scripts moved from `src/` to `packages/core`, `packages/cold` and `packages/hot`. Nothing else in
+this README changes: the cold and hot scripts are built and run exactly as before, and the cold bundle installs the same
+packages. The repository and its folder are now named `cold-crossing` (formerly `midnight-cold-hot`; GitHub redirects the old
+URL), and so is the folder inside the cold bundle: on the cold machine, `cd cold-crossing`. `MERGE-PLAN.md` has the
+plan and its phases.
+
 ## Files
 
 | Script | Runs on | Needs a seed? | What it does |
@@ -39,7 +47,7 @@ Use the exact Node tarball you will copy to the cold machine:
 export PATH="$HOME/node22/bin:$PATH"     # the unpacked official Node 22 linux-x64 tarball
 node --version
 npm install                               # creates package-lock.json: commit it and keep it pinned
-npm run build                             # compiles src/ to dist/; fix any type errors first
+npm run build                             # compiles packages/{core,cold,hot}/src/ to dist/; fix any type errors first
 npm test                                  # SDK-free unit tests (logfilter, snapshot, txinfo, mqr, cold page core)
 npm run test:sdk                          # cold page code compared with the wallet SDK (imports the SDK; offline)
 npm run test:page                         # dist/cold-page.html driven in headless Chromium (needs chromium)
@@ -82,7 +90,7 @@ the script, naming the setting but not showing its value.
 Set `ASSUME_LEDGER9=0` to turn off the chain-version probe and let the SDK detect the ledger version itself. The probe is on by default because without it an offline or idle wallet stays on the ledger 8 variant and builds transactions the network rejects. Only turn it off if you are running against a chain still on ledger 8.
 On preprod and mainnet the URLs contain your token, so the scripts never print them. The SDK's own libraries do print
 the node URL when a connection drops, so every script also replaces `project_id=...` and your token with `<redacted>`
-in anything it prints (`src/redact.ts`). If a token has ever been pasted anywhere (a chat, an issue, a screenshot), revoke
+in anything it prints (`packages/core/src/redact.ts`). If a token has ever been pasted anywhere (a chat, an issue, a screenshot), revoke
 it in the Blockfrost dashboard and create a new one.
 
 **Correction.** An earlier version of these scripts defaulted preprod to `indexer.preprod.midnight.network`
@@ -257,6 +265,7 @@ after the upgrade. "Not yet run" means nobody has run it on that version. Tests 
 | T45 *new* | Early warnings: `hot-watch` / `hot-zswap-feed` with no `wallet-state-*.json` in the folder warn; `sponsor-submit` with no state and a `tx.hex` expiring within 3 h stops and keeps it | Notice logic passed (`npm test`); hot page check and sync button passed with stand-ins (`npm run test:server`). On Preprod: **not yet run** |
 | T46 *new* | `sponsor-submit` checks the proof server (`GET /version`) before the sync and before `SUBMIT`; an unreachable one stops it with `tx.hex` kept | Check logic passed (`npm test`); against the real servers the unset local default fails and the LAN proof server answers 9.0.2. On Preprod (26 Nov 2026) a real run printed "Proof server: reachable (version 9.0.2)" and went on. The stop on Preprod: **not yet run** |
 | T47 *new* | `receiver.html` outlines the frame it read last and says how many frames until the next missing one | Passed in headless Chromium with pasted frames (26 Nov 2026). With a camera: **not yet run** |
+| T48 *new* | The cold-crossing merge (`MERGE-PLAN.md` phase 1) changes no flow: same scripts in `dist/`, same bundle, cold code reaches for no network | Passed (26 Nov 2026), on Node 22.23.4: every suite; the `dist/` JavaScript identical apart from three import lines; the cold page's SHA-256 unchanged; the bundle from `packages/cold/bundle/` installs the same 119 packages as before the merge; `cold-export-public` and `cold-shielded-transfer --address` under `unshare -rn`; `tests/boundary.test.ts`. The wnight CLI ran `wallets` on Preprod from `packages/wnight-cli`. A cold transfer from a rebuilt bundle: **not yet run** |
 
 **How the new tests are run**
 
@@ -326,7 +335,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
 
    ```bash
    NODE_TGZ=~/Downloads/node-v22.23.4-linux-x64.tar.gz     # adjust
-   PROJECT=~/path/to/midnight-cold-hot                     # adjust
+   PROJECT=~/path/to/cold-crossing                     # adjust
    cd "$(dirname "$NODE_TGZ")"
    grep node-v22.23.4-linux-x64.tar.gz SHASUMS256.txt | sha256sum -c -
    ```
@@ -338,7 +347,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    export PATH="$HOME/node22/node-v22.23.4-linux-x64/bin:$PATH"
    node --version                      # must print v22.23.4
    cd "$PROJECT"
-   npm ci                              # all dependencies, including dev, from the lockfile
+   npm ci --ignore-scripts             # all dependencies, including dev, from the lockfile; no install scripts
    npm run build                       # writes dist/, dist/receiver.html and dist/cold-page.html
    npm run fetch:prover-keys           # prover-keys/: 8 public files (~26 MB) for shielded spends (section 13)
    ```
@@ -347,20 +356,27 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
 
    ```bash
    BUNDLE=~/cold-bundle
-   rm -rf "$BUNDLE" && mkdir -p "$BUNDLE/midnight-cold-hot"
+   rm -rf "$BUNDLE" && mkdir -p "$BUNDLE/cold-crossing"
    cp "$NODE_TGZ" "$BUNDLE/"
-   cp package.json package-lock.json "$BUNDLE/midnight-cold-hot/"
-   cp -r dist "$BUNDLE/midnight-cold-hot/"
-   cp README.md "$BUNDLE/midnight-cold-hot/"
-   cp -r prover-keys "$BUNDLE/midnight-cold-hot/"    # only needed for shielded spends (section 13)
-   cd "$BUNDLE/midnight-cold-hot"
+   cp packages/cold/bundle/package.json packages/cold/bundle/package-lock.json "$BUNDLE/cold-crossing/"
+   cp -r dist "$BUNDLE/cold-crossing/"
+   cp README.md "$BUNDLE/cold-crossing/"
+   cp -r prover-keys "$BUNDLE/cold-crossing/"    # only needed for shielded spends (section 13)
+   cd "$BUNDLE/cold-crossing"
    npm ci --omit=dev --ignore-scripts
-   find node_modules \( -name '*.node' -o -name '*.so' \)    # expect no output
+   find node_modules \( -name '*.node' -o -name '*.so' \)    # expect only @msgpackr-extract/... (see below)
    du -sh .
    ```
 
+   The bundle's `package.json` and lockfile come from `packages/cold/bundle/`, not the project root: the root lockfile
+   also holds the wnight packages' tree, whose test kit npm 10 would otherwise pull onto the cold machine (Docker and SSH
+   clients). The two hold the same versions; `npm test` checks it. With Node 22.23.4's npm the bundle has 119 packages.
+
    `package.json` is required offline because `"type": "module"` in it makes the `dist/*.js` files load as ES modules.
-   Native files in the `find` output would need to match the cold CPU and glibc, so look into them before going on.
+   Native files in the `find` output would need to match the cold CPU and glibc, so look into them before going on. The
+   only ones expected are the prebuilt files of `@msgpackr-extract/msgpackr-extract-linux-x64`, an optional speed-up of
+   `msgpackr` (wallet SDK → `@effect/platform` → `msgpackr`), which works without it. They were in the bundle before
+   the merge too; this README used to say to expect none.
    If `--ignore-scripts` breaks a package that needs an install script, step 4 will fail and show it.
 
    The Python QR scanner (`tools/` and `pylibs/`) is added in step 5, just before packing, if you use it.
@@ -370,7 +386,7 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    ```bash
    mkdir -p /tmp/ct && tar -xzf "$BUNDLE/node-v22.23.4-linux-x64.tar.gz" -C /tmp/ct
    NODE=/tmp/ct/node-v22.23.4-linux-x64/bin/node
-   rm -rf /tmp/ct/test && cp -r "$BUNDLE/midnight-cold-hot" /tmp/ct/test && cd /tmp/ct/test
+   rm -rf /tmp/ct/test && cp -r "$BUNDLE/cold-crossing" /tmp/ct/test && cd /tmp/ct/test
    COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-export-public.js
    # shielded spends (section 13): prints a mn_shield-addr_... address, offline
    COLD_MNEMONIC="$($NODE dist/keygen.js)" unshare -rn $NODE dist/cold-shielded-transfer.js --address
@@ -386,8 +402,8 @@ Node tarball you will run offline. The examples use `node-v22.23.4-linux-x64.tar
    reports (`python3 --version` on the cold machine):
 
    ```bash
-   cp -r "$PROJECT/tools" "$BUNDLE/midnight-cold-hot/"
-   cp -r "$PROJECT/pylibs" "$BUNDLE/midnight-cold-hot/"
+   cp -r "$PROJECT/tools" "$BUNDLE/cold-crossing/"
+   cp -r "$PROJECT/pylibs" "$BUNDLE/cold-crossing/"
    ```
 
    Then pack and hash. The archive includes `tools/` and `pylibs/` if you copied them:
@@ -408,16 +424,16 @@ Only `cold-bundle.tar.gz`. It contains:
 | In the bundle | Why |
 |---|---|
 | `node-v22.23.4-linux-x64.tar.gz` | The Node runtime |
-| `midnight-cold-hot/package.json` | Needed for ES module loading |
-| `midnight-cold-hot/package-lock.json` | Records exact versions |
-| `midnight-cold-hot/dist/` | The compiled scripts and `receiver.html` |
-| `midnight-cold-hot/node_modules/` | Production dependencies only |
-| `midnight-cold-hot/prover-keys/` | Public proving keys for shielded spends (section 13), with `SHA256SUMS`. Only if you spend shielded coins |
-| `midnight-cold-hot/tools/` | `qr_scan.py`, the Python QR scanner. Only if you use it |
-| `midnight-cold-hot/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
-| `midnight-cold-hot/README.md` | These instructions, to read on the cold machine |
+| `cold-crossing/package.json` | Needed for ES module loading |
+| `cold-crossing/package-lock.json` | Records exact versions |
+| `cold-crossing/dist/` | The compiled scripts and `receiver.html` |
+| `cold-crossing/node_modules/` | Production dependencies only |
+| `cold-crossing/prover-keys/` | Public proving keys for shielded spends (section 13), with `SHA256SUMS`. Only if you spend shielded coins |
+| `cold-crossing/tools/` | `qr_scan.py`, the Python QR scanner. Only if you use it |
+| `cold-crossing/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
+| `cold-crossing/README.md` | These instructions, to read on the cold machine |
 
-Leave out `src/`, your dev `node_modules`, `.env`, any `wallet-state-*.json`, snapshots, your Blockfrost token, and
+Leave out `packages/`, your dev `node_modules`, `.env`, any `wallet-state-*.json`, snapshots, your Blockfrost token, and
 `cold-public.json`. Later the cold machine receives the snapshot (by QR or USB) and sends back `tx.hex`.
 Rebuild and re-hash the bundle whenever the code changes.
 
@@ -430,7 +446,7 @@ tar -xzf cold-bundle.tar.gz && cd cold-bundle
 tar -xzf node-v22.23.4-linux-x64.tar.gz
 export PATH="$PWD/node-v22.23.4-linux-x64/bin:$PATH"
 node --version                          # v22.23.4
-cd midnight-cold-hot
+cd cold-crossing
 node -e "import('@midnightntwrk/wallet-sdk/ledger/v9').then(() => console.log('ledger loads'))"
 # with the Python scanner:
 PYTHONPATH=pylibs python3 -c "import cv2, numpy; print(cv2.__version__)"
@@ -693,7 +709,7 @@ Both scripts make sounds during long operations so you can step away and return 
 - **Prompt ready:** one beep when the `SUBMIT` prompt appears, then another every 20 seconds until you answer.
 - **Finished:** two beeps when the submission (or dry run) completes.
 
-All three sync the sponsor the same way (`syncAndSave` in `src/wallet.ts`, after the wnight project's sync):
+All three sync the sponsor the same way (`syncAndSave` in `packages/hot/src/wallet.ts`, after the wnight project's sync):
 
 - They say first whether they resume from a saved state (and when it was saved) or start from scratch.
 - A progress line, printed whenever a part finishes and otherwise every `MIDNIGHT_SYNC_LOG_INTERVAL_MS` (15 s):
@@ -703,7 +719,7 @@ All three sync the sponsor the same way (`syncAndSave` in `src/wallet.ts`, after
   and if the sync fails. An interrupted first sync resumes from the last save. Ctrl-C twice quits without saving.
 - **A fresh sponsor's DUST wallet starts at the ledger 9 fork.** The fork emptied the DUST state and re-issued live DUST as
   ledger 9 events, so the ledger 8 DUST history (most of the old ~9.5 h first sync) holds nothing the sponsor needs.
-  `src/dustfork.ts` finds that point on the DUST event timeline once (about 20 s on Preprod through Blockfrost) and caches
+  `packages/hot/src/dustfork.ts` finds that point on the DUST event timeline once (about 20 s on Preprod through Blockfrost) and caches
   it in `dust-fork-<network>-<indexer host>.json` in the folder (public chain data, checked against the chain on each use).
   A restored wallet resumes from its own cursor and is not affected. The shielded wallet still syncs from the start.
 - "Synced in N s (U updates)" when done, and the state is saved.
@@ -806,7 +822,7 @@ Preprod (T30–T32, 2026-11-13); section 6 lists what is still not run.** The No
 few plain-JavaScript libraries: `@scure/bip39`, `@scure/bip32` and the SDK's HD package for the keys, `fflate` and
 `@noble/hashes` for QR frames, `qrcode-generator` and `jsqr` for the codes. The build prints the list and the file's SHA-256.
 It does **not** contain the wallet SDK's wallets or its network code. It builds the transfer with the same ledger calls the SDK
-makes for an unshielded transfer with `payFees: false` (`src/coldpage/core.ts`; `cold-transfer.ts` is the reference).
+makes for an unshielded transfer with `payFees: false` (`packages/cold/src/coldpage/core.ts`; `cold-transfer.ts` is the reference).
 
 **No network.** Nothing is loaded from outside the file, and its security policy (`connect-src 'none'`) makes the browser refuse
 any connection the page might attempt. `test:page` checks both. The policy is a second lock: the machine should still be offline.
