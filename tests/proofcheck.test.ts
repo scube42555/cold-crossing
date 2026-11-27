@@ -26,8 +26,16 @@ test('a refused connection, an HTTP error and a timeout each fail with a reason'
   };
   assert.deepEqual(await checkProofServer('http://127.0.0.1:6300', refused), { ok: false, reason: 'could not connect' });
   assert.deepEqual(await checkProofServer('http://127.0.0.1:6300', answering(503, '').fetchFn), { ok: false, reason: 'it answered HTTP 503' });
+  // A server that never answers. The timer stands in for the open socket, which is what keeps the process alive until the
+  // abort: AbortSignal.timeout's own timer does not (on Node 22 the test was cancelled before the timeout fired).
   const slow = (_url: string, init: { signal: AbortSignal }) =>
-    new Promise<never>((_, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
+    new Promise<never>((_, reject) => {
+      const socket = setTimeout(() => {}, 60_000);
+      init.signal.addEventListener('abort', () => {
+        clearTimeout(socket);
+        reject(init.signal.reason);
+      });
+    });
   assert.deepEqual(await checkProofServer('http://127.0.0.1:6300', slow, 50), { ok: false, reason: 'no answer within 1 s' });
 });
 
