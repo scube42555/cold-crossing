@@ -34,7 +34,7 @@ MAX_TEXT = 4000  # longer text is never a valid frame; do not even run the patte
 
 
 def parse_frame(text):
-    """Return a dict for a valid frame, otherwise None. Mirrors parseFrame in src/mqr.ts."""
+    """Return a dict for a valid frame, otherwise None. Mirrors parseFrame in packages/core/src/mqr.ts."""
     if not isinstance(text, str) or len(text) > MAX_TEXT:
         return None
     raw = text.strip()

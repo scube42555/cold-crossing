@@ -17,10 +17,10 @@ import {
   generateMnemonicWords,
 } from '@midnightntwrk/wallet-sdk';
 import * as L from '@midnightntwrk/wallet-sdk/ledger/v9';
-import { NETWORK, NETWORK_ID, coldEndpoints, walletConfig } from '../src/config.js';
-import { deriveAndWipe, seedFromMnemonic, type WalletKeys } from '../src/keys.js';
-import { toHex } from '../src/hex.js';
-import { NIGHT, readTransaction } from '../src/txinfo.js';
+import { NETWORK, NETWORK_ID, coldEndpoints, walletConfig } from 'cold-crossing/config.js';
+import { deriveAndWipe, seedFromMnemonic, type WalletKeys } from 'cold-crossing/keys.js';
+import { toHex } from 'cold-crossing/hex.js';
+import { NIGHT, readTransaction } from 'cold-crossing/txinfo.js';
 import {
   type ColdKeys,
   type NetworkName,
@@ -32,8 +32,8 @@ import {
   keysFromUnshieldedSeed,
   planTransfer,
   verifyBuilt,
-} from '../src/coldpage/core.js';
-import { deriveColdKeys } from '../src/coldpage/keys.js';
+} from 'cold-crossing/coldpage/core.js';
+import { deriveColdKeys } from 'cold-crossing/coldpage/keys.js';
 
 const network = NETWORK as NetworkName;
 const TOKEN = 'c0'.repeat(32);

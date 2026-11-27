@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { describeProgress, progressLine, saveIntervalMs, sponsorNotice, syncLogIntervalMs } from '../src/syncprogress.js';
+import { describeProgress, progressLine, saveIntervalMs, sponsorNotice, syncLogIntervalMs } from 'cold-crossing/syncprogress.js';
 
 const done = { isStrictlyComplete: () => true, appliedIndex: 10n, highestRelevantWalletIndex: 10n };
 const part = (applied: bigint, target: bigint) => ({ isStrictlyComplete: () => false, appliedIndex: applied, highestRelevantWalletIndex: target });

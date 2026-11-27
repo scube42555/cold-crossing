@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import {
   FEED_KIND, MAX_FEED_BYTES, ROOT_LIFETIME_MS, feedDeadline, inspectFeed, normalizeTxHash, parseTxList, planGaps,
   rootMatches, rootToHexLE,
-} from '../src/zswapfeed.js';
+} from 'cold-crossing/zswapfeed.js';
 
 // A real feed written by hot-zswap-feed on Preprod (public chain data only: two shielded transactions and the tree gaps).
 const fixture = readFileSync(new URL('../../tests/fixtures/zswap-feed-preprod.json', import.meta.url), 'utf8');

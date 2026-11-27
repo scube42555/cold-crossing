@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeLogFilter, isNoisyLine, isNormalClosure } from '../src/logfilter.js';
+import { makeLogFilter, isNoisyLine, isNormalClosure } from 'cold-crossing/logfilter.js';
 
 test('isNoisyLine: matches Wallet.Sync and API-WS', () => {
   assert.ok(isNoisyLine('Wallet.Sync: [object CloseEvent]'));

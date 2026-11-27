@@ -1,6 +1,6 @@
 # Merge plan: wnight into midnight-cold-hot
 
-Status: **phase 1 in progress (2026-11-26).** Done: wnight merged with its history as `packages/contract` and `packages/wnight-cli`, npm workspaces, the package renamed `cold-crossing`; all suites pass and the cold bundle installs the same 112 packages. Still to do in phase 1: the `core`/`cold`/`hot` split, the cold bundle from `packages/cold`, the import-boundary check, the repository and folder rename, and a Preprod `wallets` run of the wnight CLI. The owner's decisions (history, name) were made on 2026-11-26.
+Status: **phase 1 in progress (2026-11-26).** Done: wnight merged with its history as `packages/contract` and `packages/wnight-cli`, npm workspaces, the package renamed `cold-crossing`; the `core`/`cold`/`hot` split (three `tsc -b` projects compiling into the one root `dist/`, so no command changes; `config`, `keys`, `syncnotice` and `mqr-web` went to core, because both machines import them); all suites pass and the cold bundle installs the same 112 packages. Still to do in phase 1: the cold bundle from `packages/cold`, the import-boundary check, and the repository and folder rename. The wnight CLI ran a Preprod `wallets` from its new folder (2026-11-26). The owner's decisions (history, name) were made on 2026-11-26.
 
 ## 1. Goal and what is possible today
 

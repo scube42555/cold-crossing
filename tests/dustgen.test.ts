@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectGenerations } from '../src/dustgen.js';
+import { collectGenerations } from 'cold-crossing/dustgen.js';
 
 const item = (generationMtIndex: number, over: Record<string, unknown> = {}) => ({
   __typename: 'DustGenerationsItem',

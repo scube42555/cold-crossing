@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkProofServer, proofServerHelp } from '../src/proofcheck.js';
+import { checkProofServer, proofServerHelp } from 'cold-crossing/proofcheck.js';
 
 const answering = (status: number, body: string) => {
   const seen: string[] = [];

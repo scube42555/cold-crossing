@@ -7,16 +7,23 @@
     "packages/wnight-cli"
   ],
   "type": "module",
+  "exports": {
+    "./*": {
+      "types": "./dist-types/*",
+      "default": "./dist/*"
+    }
+  },
   "engines": {
     "node": ">=22.12"
   },
   "scripts": {
-    "build": "tsc && node scripts/build-receiver.mjs && node scripts/build-cold-page.mjs && node scripts/build-hot-page.mjs",
-    "test": "tsc --project tsconfig.test.json && node --test dist-test/tests/*.js",
+    "build": "tsc -b --force && node scripts/build-receiver.mjs && node scripts/build-cold-page.mjs && node scripts/build-hot-page.mjs",
+    "typecheck": "tsc -b --force",
+    "test": "tsc -b --force && tsc --project tsconfig.test.json && node --test dist-test/tests/*.js",
     "test:page": "node scripts/test-cold-page.mjs",
     "test:server": "python3 -m unittest discover -s tests-hot",
     "test:hotpage": "node scripts/test-hot-page.mjs",
-    "test:sdk": "tsc --project tsconfig.test.json && node --test --test-force-exit dist-test/tests-sdk/*.js",
+    "test:sdk": "tsc -b --force && tsc --project tsconfig.test.json && node --test --test-force-exit dist-test/tests-sdk/*.js",
     "keygen": "node dist/keygen.js",
     "cold:export-public": "node dist/cold-export-public.js",
     "hot:watch": "node dist/hot-watch.js",
@@ -29,7 +36,7 @@
     "qr:decode": "node dist/qr-decode.js",
     "probe:cold-era": "node dist/probe-cold-era.js",
     "fetch:prover-keys": "node scripts/fetch-prover-keys.mjs",
-    "build:prover-lab": "tsc && node scripts/build-prover-lab.mjs",
+    "build:prover-lab": "tsc -b --force && node scripts/build-prover-lab.mjs",
     "test:prover-lab": "node scripts/test-prover-lab.mjs",
     "prover-lab:node": "node scripts/prover-lab-node.mjs",
     "hot:zswap-feed": "node dist/hot-zswap-feed.js",

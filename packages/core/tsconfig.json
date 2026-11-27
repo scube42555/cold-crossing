@@ -1,0 +1,17 @@
+{
+  // All three of core, cold and hot compile into the one root dist/, side by side, so the scripts keep their paths
+  // (node dist/cold-transfer.js). rootDirs lets "./txinfo.js" in this package find core's file, as it will in dist/.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "rootDirs": ["src"],
+    "outDir": "../../dist",
+    "declarationDir": "../../dist-types",
+    "tsBuildInfoFile": "../../dist-types/core.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "references": []
+}

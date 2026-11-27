@@ -9,7 +9,7 @@ import {
   parseTtlMinutes,
   planTransfer,
   wholeSeconds,
-} from '../src/coldpage/core.js';
+} from 'cold-crossing/coldpage/core.js';
 
 const NIGHT = '0'.repeat(64);
 const TOKEN = 'ab'.repeat(32);

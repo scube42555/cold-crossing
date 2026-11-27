@@ -14,7 +14,8 @@ Use throwaway wallets and faucet tokens only. A recovery phrase that has appeare
 must never hold real funds.
 
 **Becoming cold-crossing (2026-11-26).** The wnight project (the 1:1 shielded wrapper for tNIGHT) has been merged in with its
-history, as `packages/contract` and `packages/wnight-cli` (an online developer CLI; its README is in that folder). Nothing in
+history, as `packages/contract` and `packages/wnight-cli` (an online developer CLI; its README is in that folder). The
+sources of the cold and hot scripts moved from `src/` to `packages/core`, `packages/cold` and `packages/hot`. Nothing else in
 this README changes: the cold and hot scripts are built and run exactly as before, and the cold bundle installs the same
 packages. `MERGE-PLAN.md` has the plan and its phases.
 
@@ -44,7 +45,7 @@ Use the exact Node tarball you will copy to the cold machine:
 export PATH="$HOME/node22/bin:$PATH"     # the unpacked official Node 22 linux-x64 tarball
 node --version
 npm install                               # creates package-lock.json: commit it and keep it pinned
-npm run build                             # compiles src/ to dist/; fix any type errors first
+npm run build                             # compiles packages/{core,cold,hot}/src/ to dist/; fix any type errors first
 npm test                                  # SDK-free unit tests (logfilter, snapshot, txinfo, mqr, cold page core)
 npm run test:sdk                          # cold page code compared with the wallet SDK (imports the SDK; offline)
 npm run test:page                         # dist/cold-page.html driven in headless Chromium (needs chromium)
@@ -87,7 +88,7 @@ the script, naming the setting but not showing its value.
 Set `ASSUME_LEDGER9=0` to turn off the chain-version probe and let the SDK detect the ledger version itself. The probe is on by default because without it an offline or idle wallet stays on the ledger 8 variant and builds transactions the network rejects. Only turn it off if you are running against a chain still on ledger 8.
 On preprod and mainnet the URLs contain your token, so the scripts never print them. The SDK's own libraries do print
 the node URL when a connection drops, so every script also replaces `project_id=...` and your token with `<redacted>`
-in anything it prints (`src/redact.ts`). If a token has ever been pasted anywhere (a chat, an issue, a screenshot), revoke
+in anything it prints (`packages/core/src/redact.ts`). If a token has ever been pasted anywhere (a chat, an issue, a screenshot), revoke
 it in the Blockfrost dashboard and create a new one.
 
 **Correction.** An earlier version of these scripts defaulted preprod to `indexer.preprod.midnight.network`
@@ -422,7 +423,7 @@ Only `cold-bundle.tar.gz`. It contains:
 | `midnight-cold-hot/pylibs/` | The unzipped OpenCV and NumPy wheels. Only if you use the Python scanner |
 | `midnight-cold-hot/README.md` | These instructions, to read on the cold machine |
 
-Leave out `src/`, your dev `node_modules`, `.env`, any `wallet-state-*.json`, snapshots, your Blockfrost token, and
+Leave out `packages/`, your dev `node_modules`, `.env`, any `wallet-state-*.json`, snapshots, your Blockfrost token, and
 `cold-public.json`. Later the cold machine receives the snapshot (by QR or USB) and sends back `tx.hex`.
 Rebuild and re-hash the bundle whenever the code changes.
 
@@ -698,7 +699,7 @@ Both scripts make sounds during long operations so you can step away and return 
 - **Prompt ready:** one beep when the `SUBMIT` prompt appears, then another every 20 seconds until you answer.
 - **Finished:** two beeps when the submission (or dry run) completes.
 
-All three sync the sponsor the same way (`syncAndSave` in `src/wallet.ts`, after the wnight project's sync):
+All three sync the sponsor the same way (`syncAndSave` in `packages/hot/src/wallet.ts`, after the wnight project's sync):
 
 - They say first whether they resume from a saved state (and when it was saved) or start from scratch.
 - A progress line, printed whenever a part finishes and otherwise every `MIDNIGHT_SYNC_LOG_INTERVAL_MS` (15 s):
@@ -708,7 +709,7 @@ All three sync the sponsor the same way (`syncAndSave` in `src/wallet.ts`, after
   and if the sync fails. An interrupted first sync resumes from the last save. Ctrl-C twice quits without saving.
 - **A fresh sponsor's DUST wallet starts at the ledger 9 fork.** The fork emptied the DUST state and re-issued live DUST as
   ledger 9 events, so the ledger 8 DUST history (most of the old ~9.5 h first sync) holds nothing the sponsor needs.
-  `src/dustfork.ts` finds that point on the DUST event timeline once (about 20 s on Preprod through Blockfrost) and caches
+  `packages/hot/src/dustfork.ts` finds that point on the DUST event timeline once (about 20 s on Preprod through Blockfrost) and caches
   it in `dust-fork-<network>-<indexer host>.json` in the folder (public chain data, checked against the chain on each use).
   A restored wallet resumes from its own cursor and is not affected. The shielded wallet still syncs from the start.
 - "Synced in N s (U updates)" when done, and the state is saved.
@@ -811,7 +812,7 @@ Preprod (T30–T32, 2026-11-13); section 6 lists what is still not run.** The No
 few plain-JavaScript libraries: `@scure/bip39`, `@scure/bip32` and the SDK's HD package for the keys, `fflate` and
 `@noble/hashes` for QR frames, `qrcode-generator` and `jsqr` for the codes. The build prints the list and the file's SHA-256.
 It does **not** contain the wallet SDK's wallets or its network code. It builds the transfer with the same ledger calls the SDK
-makes for an unshielded transfer with `payFees: false` (`src/coldpage/core.ts`; `cold-transfer.ts` is the reference).
+makes for an unshielded transfer with `payFees: false` (`packages/cold/src/coldpage/core.ts`; `cold-transfer.ts` is the reference).
 
 **No network.** Nothing is loaded from outside the file, and its security policy (`connect-src 'none'`) makes the browser refuse
 any connection the page might attempt. `test:page` checks both. The policy is a second lock: the machine should still be offline.
